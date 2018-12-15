@@ -56,6 +56,10 @@ network-manager-gnome
 gnome-terminal
 )
 
+gnome=(
+gnome-core
+)
+
 vmware=(
     open-vm-tools-desktop
     open-vm-tools
@@ -68,5 +72,5 @@ $bases
 typeset -U paquets
 
 apt update
-apt install -y --no-install-recommends --no-install-suggests $paquets
+apt install -y $paquets
 
