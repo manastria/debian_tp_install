@@ -72,5 +72,6 @@ $bases
 typeset -U paquets
 
 apt update
+# apt install -y --no-install-recommends --no-install-suggests $paquets
 apt install -y $paquets
 
