@@ -95,8 +95,6 @@ apache=(
 paquets=(
     $bases
 )
-typeset -U paquets
-
 
 while getopts ':sp:' arg; do
     case $arg in
@@ -123,7 +121,7 @@ then
     case ${INSTPKT} in
     apache)
         echo "Installation d'Apache"
-        paquets+=${apache}
+		paquets=($paquets $apache)
         ;;
     gnome)
         echo "Installation de Gnome"
@@ -136,6 +134,7 @@ typeset -U paquets
 
 # Print sorted list
 echo $(echo -e "${paquets// /\\n}" | sort -u)
+echo ${paquets}
 
 #apt update
 ## apt install -y --no-install-recommends --no-install-suggests $paquets
