@@ -89,6 +89,7 @@ apache=(
     php7.0-pdo-sqlite
     php7.0-sqlite3
     php7.0-mysql
+    openssl
 )
 
 paquets=(
@@ -96,7 +97,47 @@ paquets=(
 )
 typeset -U paquets
 
-apt update
-# apt install -y --no-install-recommends --no-install-suggests $paquets
+
+while getopts ':sp:' arg; do
+    case $arg in
+    s) print got s; s=sss;;
+    p)
+        echo "-p $OPTARG" >&2
+        INSTPKT=$OPTARG
+        ;;
+    \*) 
+        print nothing: $OPTARG;;
+    \?)
+        echo "Invalid option: -$OPTARG" >&2
+        exit 1
+        ;;
+    :)
+        echo "Option -$OPTARG requires an argument." >&2
+        exit 1
+        ;;
+    esac
+done
+
+if [ ! -z ${INSTPKT} ]
+then
+    case ${INSTPKT} in
+    apache)
+        echo "Installation d'Apache"
+        paquets+=${apache}
+        ;;
+    gnome)
+        echo "Installation de Gnome"
+        paquets+=${apache}
+        ;;
+    esac
+fi
+
+typeset -U paquets
+
+# Print sorted list
+echo $(echo -e "${paquets// /\\n}" | sort -u)
+
+#apt update
+## apt install -y --no-install-recommends --no-install-suggests $paquets
 apt install -y $paquets
 
