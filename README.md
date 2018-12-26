@@ -21,3 +21,9 @@ EOF
 
 
 
+apt update && apt install -y git zsh vim yadm
+git clone git@github.com:manastria/debian_tp_install.git
+./base.zsh
+./install_rngtools.sh
+./install_issue.sh
+./paquets.zsh -p apache
