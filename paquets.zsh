@@ -96,10 +96,6 @@ basenet=(
 	net-tools
 )
 
-paquets=(
-    $bases
-)
-
 tp=(
 	apt-file
 	command-not-found
