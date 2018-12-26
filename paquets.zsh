@@ -92,8 +92,18 @@ apache=(
     openssl
 )
 
+basenet=(
+	net-tools
+)
+
 paquets=(
     $bases
+)
+
+tp=(
+	apt-file
+	command-not-found
+	sudo
 )
 
 while getopts ':sp:' arg; do
@@ -103,7 +113,7 @@ while getopts ':sp:' arg; do
         echo "-p $OPTARG" >&2
         INSTPKT=$OPTARG
         ;;
-    \*) 
+    \*)
         print nothing: $OPTARG;;
     \?)
         echo "Invalid option: -$OPTARG" >&2
@@ -126,6 +136,14 @@ then
     gnome)
         echo "Installation de Gnome"
         paquets+=${apache}
+        ;;
+    tp)
+        echo "Installation de tp"
+        paquets+=${tp}
+        ;;
+    basenet)
+        echo "Installation de basenet"
+        paquets+=${basenet}
         ;;
     esac
 fi

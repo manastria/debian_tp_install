@@ -16,43 +16,7 @@ EOF
 
 
 
-bases=(
-    aptitude
-    bash-completion
-    build-essential
-    byobu
-    ccze
-    curl
-    git
-    gpgv2
-    haveged
-    less
-    linux-headers-$(uname -r)
-    lnav
-    locales-all
-    most
-    multitail
-    rng-tools
-    screen
-    screenfetch
-    sudo
-    tmux
-    unzip
-    vim
-    yadm
-    zip
-    zsh
-)
-
-
-paquets=(
-    $bases
-)
-typeset -U paquets
+./paquets.zsh -p bases
 
 yadm clone git@bitbucket.org:manastria/dotfile.git
 yadm reset --hard origin/master
-
-
-apt update
-apt install -y $paquets
