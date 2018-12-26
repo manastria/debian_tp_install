@@ -1,12 +1,16 @@
 #!/bin/bash
 
+printf "\n"
 echo -ne "\033[32;1mInstallation des paquets basenet\033[0m"
-./paquets -p basenet
+./paquets.zsh -p basenet
+printf "\n"
 read -p "Press key to continue.. " -n1 -s
 
 
+printf "\n"
 echo -ne "\033[32;1mInstallation des paquets tp\033[0m"
-./paquets -p tp
+./paquets.zsh -p tp
+printf "\n"
 read -p "Press key to continue.. " -n1 -s
 
 #=============================================================================
@@ -65,16 +69,21 @@ EOF
 
 
 # APTCOMMANDNOTFOUND
+printf "\n"
 echo -ne "\033[32;1mConfiguration de command-not-found\033[0m"
 /usr/sbin/update-command-not-found
+printf "\n"
 read -p "Press key to continue.. " -n1 -s
 
 # APTAPTFILE
+printf "\n"
 echo -ne "\033[32;1mConfiguration de apt-file\033[0m"
 apt-file update
+printf "\n"
 read -p "Press key to continue.. " -n1 -s
 
 # SUDO
+printf "\n"
 echo -ne "\033[32;1mConfiguration de sudo\033[0m"
 cat > /etc/sudoers.d/admins << EOF
 Defaults        env_keep += "HOME"
@@ -88,6 +97,7 @@ EOF
 chmod 0440 /etc/sudoers.d/admins
 
 
+printf "\n"
 echo -ne "\033[32;1mConfiguration des groupes\033[0m"
 if ! id -u sysadmin > /dev/null 2>&1
 then
@@ -99,7 +109,7 @@ then
 	groupadd admins
 fi
 
-if ! id -Gn sysadmin | grep '\badmins\b'
+if ! id -Gn sysadmin | grep '\badmins\b' > /dev/null 2>&1
 then
 	usermod -aG admins sysadmin
 fi

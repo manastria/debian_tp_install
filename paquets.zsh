@@ -110,7 +110,8 @@ while getopts ':sp:' arg; do
     case $arg in
     s) print got s; s=sss;;
     p)
-        echo "-p $OPTARG" >&2
+		printf "\n"
+        #echo "-p $OPTARG" >&2
         INSTPKT=$OPTARG
         ;;
     \*)
@@ -135,15 +136,15 @@ then
         ;;
     gnome)
         echo "Installation de Gnome"
-        paquets+=${apache}
+		paquets=($paquets $gnome)
         ;;
     tp)
         echo "Installation de tp"
-        paquets+=${tp}
+		paquets=($paquets $tp)
         ;;
     basenet)
         echo "Installation de basenet"
-        paquets+=${basenet}
+		paquets=($paquets $basenet)
         ;;
     esac
 fi
