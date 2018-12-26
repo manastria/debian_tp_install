@@ -1,8 +1,10 @@
 #/bin/bash
 
 echo -e "\033[34m===============================================================================\033[0m"
-echo "Reconfigure openssh-server"
+echo "Configure rngtools"
 echo -e "\033[34m===============================================================================\033[0m"
+
+apt install -y haveged rng-tools
 
 cat > /etc/default/rng-tools << EOF
 # Configuration for the rng-tools initscript
