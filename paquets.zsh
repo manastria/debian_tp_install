@@ -106,29 +106,9 @@ tp=(
 	sudo
 )
 
-while getopts ':sp:' arg; do
-    case $arg in
-    s) print got s; s=sss;;
-    p)
-		printf "\n"
-        #echo "-p $OPTARG" >&2
-        INSTPKT=$OPTARG
-        ;;
-    \*)
-        print nothing: $OPTARG;;
-    \?)
-        echo "Invalid option: -$OPTARG" >&2
-        exit 1
-        ;;
-    :)
-        echo "Option -$OPTARG requires an argument." >&2
-        exit 1
-        ;;
-    esac
-done
 
-if [ ! -z ${INSTPKT} ]
-then
+for INSTPKT
+do
     case ${INSTPKT} in
     apache)
         echo "Installation d'Apache"
@@ -146,13 +126,18 @@ then
         echo "Installation de basenet"
 		paquets=($paquets $basenet)
         ;;
+	*)
+		echo "Incorrect : ${INSTPKT}" >&2
+		exit 1
+		;;
     esac
-fi
+done
 
 typeset -U paquets
 
+setopt shwordsplit
 # Print sorted list
-echo $(echo -e "${paquets// /\\n}" | sort -u)
+paquets=$(echo $(echo -e "${paquets// /\\n}" | sort -u))
 echo ${paquets}
 
 #apt update
