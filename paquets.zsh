@@ -93,7 +93,9 @@ apache=(
 )
 
 postfix=(
-
+	postfixadmin
+	postfix
+	postfix-mysql
 )
 
 basenet=(
