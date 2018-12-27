@@ -100,6 +100,7 @@ tp=(
 	apt-file
 	command-not-found
 	sudo
+	etckeeper
 )
 
 

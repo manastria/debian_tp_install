@@ -21,13 +21,14 @@ EOF
 
 
 
-apt update && apt install -y git zsh vim yadm
+apt update && apt install -y git zsh vim yadm etckeeper
+etckeeper commit
 git clone git@github.com:manastria/debian_tp_install.git
 ./base.zsh
 ./install_tp.sh
 ./install_rngtools.sh
 ./install_issue.sh
-./paquets.zsh -p apache
+./paquets.zsh apache
 ./install_webmin.zsh
 ./install_mysql.zsh
 ####### Passwd : netlab123
