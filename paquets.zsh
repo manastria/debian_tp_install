@@ -92,6 +92,10 @@ apache=(
     openssl
 )
 
+postfix=(
+
+)
+
 basenet=(
 	net-tools
 )
@@ -107,6 +111,14 @@ tp=(
 for INSTPKT
 do
     case ${INSTPKT} in
+	bases)
+        echo "Installation des paquets de bases"
+		paquets=($paquets $bases)
+        ;;
+	postfix)
+        echo "Installation de postfix"
+		paquets=($paquets $postfix)
+        ;;
     apache)
         echo "Installation d'Apache"
 		paquets=($paquets $apache)
