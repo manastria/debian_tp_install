@@ -64,6 +64,7 @@ EOF
 # APTCOMMANDNOTFOUND
 printf "\n"
 echo -ne "\033[32;1mConfiguration de command-not-found\033[0m"
+apt update
 /usr/sbin/update-command-not-found
 printf "\n"
 read -p "Press key to continue.. " -n1 -s
