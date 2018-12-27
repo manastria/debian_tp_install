@@ -21,6 +21,8 @@ APT {
 };
 EOF
 
+apt update
+
 ./paquets.zsh bases
 
 yadm clone git@bitbucket.org:manastria/dotfile.git
