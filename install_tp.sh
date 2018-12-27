@@ -1,15 +1,8 @@
 #!/bin/bash
 
 printf "\n"
-echo -ne "\033[32;1mInstallation des paquets basenet\033[0m"
-./paquets.zsh -p basenet
-printf "\n"
-read -p "Press key to continue.. " -n1 -s
-
-
-printf "\n"
-echo -ne "\033[32;1mInstallation des paquets tp\033[0m"
-./paquets.zsh -p tp
+echo -ne "\033[32;1mInstallation des paquets\033[0m"
+./paquets.zsh basenet tp
 printf "\n"
 read -p "Press key to continue.. " -n1 -s
 
