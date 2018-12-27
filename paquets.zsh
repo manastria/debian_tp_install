@@ -14,6 +14,7 @@ bases=(
     linux-headers-$(uname -r)
     lnav
     locales-all
+	mlocate
     most
     multitail
     rng-tools
@@ -94,10 +95,23 @@ apache=(
 
 postfixadmin=(
 	postfixadmin
-	postfix
-	postfix-mysql
 )
 
+postfix=(
+	postfix
+	postfix-mysql
+	postfix-pcre
+	sasl2-bin
+	libsasl2-modules
+	libsasl2-modules-sql
+)
+
+dovecot=(
+	dovecot-mysql
+	dovecot-pop3d
+	dovecot-imapd
+	dovecot-managesieved
+)
 
 basenet=(
 	net-tools
@@ -121,6 +135,10 @@ do
 	postfix)
         echo "Installation de postfix"
 		paquets=($paquets $postfix)
+        ;;
+	postfixadmin)
+        echo "Installation de postfixadmin"
+		paquets=($paquets $postfixadmin)
         ;;
     apache)
         echo "Installation d'Apache"
