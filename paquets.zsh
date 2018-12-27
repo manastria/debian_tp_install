@@ -92,11 +92,12 @@ apache=(
     openssl
 )
 
-postfix=(
+postfixadmin=(
 	postfixadmin
 	postfix
 	postfix-mysql
 )
+
 
 basenet=(
 	net-tools
