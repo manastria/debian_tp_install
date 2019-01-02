@@ -14,12 +14,12 @@ deb http://debian.mirrors.ovh.net/debian/ stretch-updates main contrib non-free
 deb-src http://debian.mirrors.ovh.net/debian/ stretch-updates main contrib non-free
 EOF
 
-cat > /etc/apt/apt.conf.d/20norecommends <<EOF
-APT {
-  Install-Recommends "false";
-  Install-Suggests "false";
-};
-EOF
+#cat > /etc/apt/apt.conf.d/20norecommends <<EOF
+#APT {
+#  Install-Recommends "false";
+#  Install-Suggests "false";
+#};
+#EOF
 
 apt update
 
