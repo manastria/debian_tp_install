@@ -4,7 +4,7 @@ printf "\n"
 echo -ne "\033[32;1mInstallation des paquets\033[0m"
 ./paquets.zsh basenet tp
 printf "\n"
-read -p "Press key to continue.. " -n1 -s
+# read -p "Press key to continue.. " -n1 -s
 
 #=============================================================================
 # Config reseau
@@ -67,14 +67,14 @@ echo -ne "\033[32;1mConfiguration de command-not-found\033[0m"
 apt update
 /usr/sbin/update-command-not-found
 printf "\n"
-read -p "Press key to continue.. " -n1 -s
+# read -p "Press key to continue.. " -n1 -s
 
 # APTAPTFILE
 printf "\n"
 echo -ne "\033[32;1mConfiguration de apt-file\033[0m"
 apt-file update
 printf "\n"
-read -p "Press key to continue.. " -n1 -s
+# read -p "Press key to continue.. " -n1 -s
 
 # SUDO
 printf "\n"
