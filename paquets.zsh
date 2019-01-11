@@ -22,6 +22,7 @@ bases=(
     screenfetch
     sudo
     tmux
+	tree
     unzip
     vim
     yadm
@@ -29,8 +30,17 @@ bases=(
     zsh
 )
 
+bind=(
+	bind9
+	bind9-host
+	dnsutils
+)
+
 gnome=(
     gnome-core
+#	libgl1-mesa-dri
+#	open-vm-tools-desktop
+#	xserver-xorg-video-vmware
 )
 
 vmware=(
@@ -124,6 +134,10 @@ tp=(
 	etckeeper
 )
 
+lamp=(
+	$apache
+	$bind
+)
 
 for INSTPKT
 do
