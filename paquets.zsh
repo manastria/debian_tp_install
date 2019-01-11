@@ -43,6 +43,12 @@ gnome=(
 #	xserver-xorg-video-vmware
 )
 
+
+tpgnome=(
+    gnome-core
+    open-vm-tools-desktop
+)
+
 vmware=(
     open-vm-tools-desktop
     open-vm-tools
@@ -162,6 +168,10 @@ do
         echo "Installation de Gnome"
 		paquets=($paquets $gnome)
         ;;
+    tpgnome)
+        echo "Installation de TP Gnome"
+		paquets=($paquets $tpgnome)
+        ;;
     tp)
         echo "Installation de tp"
 		paquets=($paquets $tp)
@@ -169,6 +179,10 @@ do
     basenet)
         echo "Installation de basenet"
 		paquets=($paquets $basenet)
+        ;;
+    lamp)
+        echo "Installation de lamp"
+		paquets=($paquets $lamp)
         ;;
 	*)
 		echo "Incorrect : ${INSTPKT}" >&2
