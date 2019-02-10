@@ -35,12 +35,16 @@ EOF
 
 
 # apt update && apt install -y git zsh vim yadm etckeeper && etckeeper commit -m "Installation de Debian"
+# ssh-keyscan -H github.com >> ~/.ssh/known_hosts
+# ssh-keyscan -H bitbucket.org >> ~/.ssh/known_hosts
 # git clone git@github.com:manastria/debian_tp_install.git
 
 
+
+
 ./base.zsh
-./install_tp.sh
 ./install_rngtools.sh
+./install_tp.sh
 ./install_issue.sh
 ./paquets.zsh apache
 ./install_webmin.zsh
