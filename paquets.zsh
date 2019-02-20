@@ -162,6 +162,7 @@ gpg_gui=(
 
 gui_base=(
 	firefox-esr
+	firefox-esr-gnome-keyring
 )
 
 for INSTPKT
@@ -206,6 +207,7 @@ do
     gnomevm)
         echo "Installation de lamp"
 		paquets=($paquets $gnome $vmware_gui)
+		;;
 	gpg)
         echo "Installation de lamp"
 		paquets=($paquets $gpg)
@@ -213,9 +215,11 @@ do
 	gpg_gui)
         echo "Installation de lamp"
 		paquets=($paquets $gpg_gui)
+		;;
 	gui_base)
         echo "Installation de lamp"
 		paquets=($paquets $gui_base)
+		;;
 	*)
 		echo "Incorrect : ${INSTPKT}" >&2
 		exit 1
