@@ -49,9 +49,12 @@ tpgnome=(
     open-vm-tools-desktop
 )
 
-vmware=(
-    open-vm-tools-desktop
+vmware_cli=(
     open-vm-tools
+)
+
+vmware_gui=(
+    open-vm-tools-desktop
 )
 
 lxc=(
@@ -183,6 +186,10 @@ do
     lamp)
         echo "Installation de lamp"
 		paquets=($paquets $lamp)
+        ;;
+    gnomevm)
+        echo "Installation de lamp"
+		paquets=($paquets $gnome $vmware_gui)
         ;;
 	*)
 		echo "Incorrect : ${INSTPKT}" >&2
