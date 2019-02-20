@@ -152,6 +152,7 @@ gpg=(
 	gpgv2
 	signing-party
 	debian-keyring
+	cryptsetup-bin
 )
 
 gpg_gui=(
