@@ -148,6 +148,22 @@ lamp=(
 	$bind
 )
 
+gpg=(
+	gpgv2
+	signing-party
+	debian-keyring
+)
+
+gpg_gui=(
+	$gpg
+	seahorse
+	keepass2
+)
+
+gui_base=(
+	firefox-esr
+)
+
 for INSTPKT
 do
     case ${INSTPKT} in
@@ -190,7 +206,16 @@ do
     gnomevm)
         echo "Installation de lamp"
 		paquets=($paquets $gnome $vmware_gui)
+	gpg)
+        echo "Installation de lamp"
+		paquets=($paquets $gpg)
         ;;
+	gpg_gui)
+        echo "Installation de lamp"
+		paquets=($paquets $gpg_gui)
+	gui_base)
+        echo "Installation de lamp"
+		paquets=($paquets $gui_base)
 	*)
 		echo "Incorrect : ${INSTPKT}" >&2
 		exit 1
