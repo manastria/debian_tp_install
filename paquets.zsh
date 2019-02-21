@@ -159,11 +159,14 @@ gpg_gui=(
 	$gpg
 	seahorse
 	keepass2
+    kgpg
 )
 
 gui_base=(
 	firefox-esr
 	firefox-esr-gnome-keyring
+    konsole
+    terminator
 )
 
 for INSTPKT
