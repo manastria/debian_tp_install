@@ -176,6 +176,10 @@ do
         echo "Installation des paquets de bases"
 		paquets=($paquets $bases)
         ;;
+	bind)
+        echo "Installation des paquets de bases"
+		paquets=($paquets $bind)
+        ;;
 	postfix)
         echo "Installation de postfix"
 		paquets=($paquets $postfix)
