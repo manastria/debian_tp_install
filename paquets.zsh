@@ -153,6 +153,7 @@ gpg=(
 	signing-party
 	debian-keyring
 	cryptsetup-bin
+	qrencode
 )
 
 gpg_gui=(
