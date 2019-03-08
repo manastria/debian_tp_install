@@ -149,6 +149,10 @@ basenet=(
 	net-tools
 )
 
+postfixadmin=(
+	postfixadmin
+)
+
 tp=(
 	apt-file
 	command-not-found
@@ -252,6 +256,14 @@ do
 	gui_base)
         echo "Installation de gui_base"
 		paquets=($paquets $gui_base)
+		;;
+	dovecot)
+        echo "Installation de dovecot"
+		paquets=($paquets $dovecot)
+		;;
+	postfixadmin)
+        echo "Installation de postfixadmin"
+		paquets=($paquets $postfixadmin)
 		;;
 	*)
 		echo "Incorrect : ${INSTPKT}" >&2
