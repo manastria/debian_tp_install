@@ -97,6 +97,13 @@ other=(
     python
 )
 
+phpmyadmin=(
+	$lamp
+	phpmyadmin
+	php-mbstring
+	php-gettext
+)
+
 apache=(
     apache2
     php7.0
@@ -197,6 +204,10 @@ do
 	postfixadmin)
         echo "Installation de postfixadmin"
 		paquets=($paquets $postfixadmin)
+        ;;
+	phpmyadmin)
+        echo "Installation de phpmyadmin"
+		paquets=($paquets $phpmyadmin)
         ;;
     apache)
         echo "Installation d'Apache"
