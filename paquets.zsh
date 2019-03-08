@@ -108,8 +108,13 @@ apache=(
     php7.0-imagick
     php7.0-pdo-sqlite
     php7.0-sqlite3
-    php7.0-mysql
+
     openssl
+)
+
+mysql=(
+	mysql-client
+	mysql-server
 )
 
 postfixadmin=(
@@ -123,6 +128,7 @@ postfix=(
 	sasl2-bin
 	libsasl2-modules
 	libsasl2-modules-sql
+	mailutils
 )
 
 dovecot=(
@@ -146,6 +152,8 @@ tp=(
 lamp=(
 	$apache
 	$bind
+	$mysql
+	php7.0-mysqli
 )
 
 gpg=(
@@ -154,6 +162,7 @@ gpg=(
 	debian-keyring
 	cryptsetup-bin
 	qrencode
+	dirmngr
 )
 
 gpg_gui=(
