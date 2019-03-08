@@ -222,20 +222,24 @@ do
         echo "Installation de lamp"
 		paquets=($paquets $lamp)
         ;;
+	mysql)
+        echo "Installation de mysql"
+		paquets=($paquets $mysql)
+        ;;
     gnomevm)
-        echo "Installation de lamp"
+        echo "Installation de gnomevm"
 		paquets=($paquets $gnome $vmware_gui)
 		;;
 	gpg)
-        echo "Installation de lamp"
+        echo "Installation de gpg"
 		paquets=($paquets $gpg)
         ;;
 	gpg_gui)
-        echo "Installation de lamp"
+        echo "Installation de gpg_gui"
 		paquets=($paquets $gpg_gui)
 		;;
 	gui_base)
-        echo "Installation de lamp"
+        echo "Installation de gui_base"
 		paquets=($paquets $gui_base)
 		;;
 	*)
