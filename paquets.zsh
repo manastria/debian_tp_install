@@ -149,10 +149,6 @@ basenet=(
 	net-tools
 )
 
-postfixadmin=(
-	postfixadmin
-)
-
 tp=(
 	apt-file
 	command-not-found
@@ -181,13 +177,18 @@ gpg_gui=(
 	seahorse
 	keepass2
     kgpg
+	firefox-esr-gnome-keyring
 )
 
 gui_base=(
 	firefox-esr
-	firefox-esr-gnome-keyring
     konsole
     terminator
+)
+
+gui_mail=(
+	$gui_base
+	evolution
 )
 
 for INSTPKT
@@ -264,6 +265,10 @@ do
 	postfixadmin)
         echo "Installation de postfixadmin"
 		paquets=($paquets $postfixadmin)
+		;;
+	gui_mail)
+        echo "Installation de gui_mail"
+		paquets=($paquets $gui_mail)
 		;;
 	*)
 		echo "Incorrect : ${INSTPKT}" >&2
