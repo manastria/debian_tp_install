@@ -145,6 +145,13 @@ dovecot=(
 	dovecot-managesieved
 )
 
+roundcube=(
+	roundcube
+	roundcube-mysql
+	roundcube-plugins
+	roundcube-plugins-extra
+)
+
 basenet=(
 	net-tools
 )
@@ -269,6 +276,10 @@ do
 	gui_mail)
         echo "Installation de gui_mail"
 		paquets=($paquets $gui_mail)
+		;;
+	roundcube)
+	    echo "Installation de roundcube"
+		paquets=($paquets $roundcube)
 		;;
 	*)
 		echo "Incorrect : ${INSTPKT}" >&2
