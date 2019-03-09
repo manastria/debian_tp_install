@@ -44,7 +44,7 @@ gnome=(
 )
 
 
-tpgnome=(
+gnome_tp=(
     gnome-core
     open-vm-tools-desktop
 )
@@ -194,7 +194,6 @@ gui_base=(
 )
 
 gui_mail=(
-	$gui_base
 	evolution
 )
 
@@ -229,9 +228,9 @@ do
         echo "Installation de Gnome"
 		paquets=($paquets $gnome)
         ;;
-    tpgnome)
+    gnome_tp)
         echo "Installation de TP Gnome"
-		paquets=($paquets $tpgnome)
+		paquets=($paquets $gnome_tp)
         ;;
     tp)
         echo "Installation de tp"
