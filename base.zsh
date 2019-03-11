@@ -25,5 +25,7 @@ apt update
 
 ./paquets.zsh bases
 
+systemctl disable rng-tools
+
 yadm clone git@bitbucket.org:manastria/dotfile.git
 yadm reset --hard origin/master

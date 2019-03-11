@@ -17,7 +17,7 @@ bases=(
 	mlocate
     most
     multitail
-#    rng-tools
+    rng-tools
     screen
     screenfetch
     sudo
