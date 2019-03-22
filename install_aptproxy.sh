@@ -16,7 +16,7 @@ Acquire::Retries 0;
 Acquire::http::Proxy-Auto-Detect "/etc/apt/detect-http-proxy";
 EOF
 
-cat > /etc/apt/detect-http-proxy <<EOF
+cat > /etc/apt/detect-http-proxy <<'EOF'
 #!/bin/bash
 # detect-http-proxy - Returns a HTTP proxy which is available for use
 
