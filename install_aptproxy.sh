@@ -4,8 +4,9 @@
 # read -r IPPROXY
 # echo "Acquire::http::Proxy \"http://${IPPROXY}\";" > /etc/apt/apt.conf.d/01proxy
 
+rm -f /etc/apt/apt.conf.d/30detectproxy
 
-cat > /etc/apt/apt.conf.d/30detectproxy <<EOF
+cat > /etc/apt/apt.conf.d/30proxy <<EOF
 # Fail immediately if a file could not be retrieved. Comment if you have a bad
 # Internet connection
 Acquire::Retries 0;
