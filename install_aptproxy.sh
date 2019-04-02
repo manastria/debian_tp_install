@@ -39,8 +39,8 @@ show_proxy_messages=1
 # be available on the top. If no proxy is available, a direct connection will
 # be used
 try_proxies=(
-192.168.1.81:9999
 172.16.0.1:3128
+192.168.1.81:9999
 )
 
 print_msg() {
@@ -50,7 +50,7 @@ print_msg() {
 
 for proxy in "${try_proxies[@]}"; do
     # if the host machine / proxy is reachable...
-    if nc -z ${proxy/:/ }; then
+    if nc -w 1 -z ${proxy/:/ }; then
         proxy=http://$proxy
         print_msg "Proxy that will be used: $proxy"
         echo "$proxy"
