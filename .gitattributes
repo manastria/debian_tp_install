@@ -1,0 +1,20 @@
+# .gitattributes
+
+* text=auto
+
+# Declaration des fichiers qui n'ont pas de fin de ligne particulière
+*.notf text
+
+# Declaration des fichiers qui doivent être au format CRLF lors du checkout.
+*.winf eol=crlf
+
+# Declaration des fichiers qui doivent être au format LF lors du checkout.
+*.sh eol=lf
+*.zsh eol=lf
+*.md eol=lf
+*.adoc eol=lf
+*.lfabc eol=lf
+
+# Déclarer les fichiers qui sont vraiment binaire et ne devraient pas être modifiés .
+*.jpeg binary
+

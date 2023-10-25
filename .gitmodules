@@ -1,0 +1,4 @@
+[submodule "debian_config"]
+	path = debian_config
+	url = https://github.com/manastria/debian_config.git
+	pushurl = git@github.com:manastria/debian_config.git
