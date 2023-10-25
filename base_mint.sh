@@ -477,7 +477,7 @@ function main() {
 
 	systemctl disable rng-tools
 
-	yadm clone https://manastria@bitbucket.org/manastria/dotfile.git
+	yadm clone https://github.com/manastria/dotfile.git
 	yadm pull
 	yadm reset --hard origin/master
 }

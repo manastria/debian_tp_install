@@ -11,6 +11,17 @@ set -o nounset          # Disallow expansion of unset variables
 set -o pipefail         # Use last non-zero exit code in a pipeline
 #set -o xtrace          # Trace the execution of the script (debug)
 
+YADM_HELPER="${HOME}/debian_tp_install/yadm_helper.sh"
+
+# Vérification de l'existence du fichier
+if [ ! -f "$YADM_HELPER" ]; then
+    echo "Erreur : $YADM_HELPER n'existe pas."
+    exit 1
+fi
+
+source "$YADM_HELPER"
+
+
 # DESC: Handler for unexpected errors
 # ARGS: $1 (optional): Exit code (defaults to 1)
 # OUTS: None
@@ -458,39 +469,33 @@ function main() {
     colour_init
     #lock_init system
 
-	# Chemin réel du script
-	real_script_dir=$(readlink -f "$0")
-	real_script_dir=$(dirname "${real_script_dir}")
+    # Chemin réel du script
+    real_script_dir=$(readlink -f "$0")
+    real_script_dir=$(dirname "${real_script_dir}")
 
-	echo "Chemin " ${real_script_dir}
+    echo "Chemin " ${real_script_dir}
 
-	${script_dir}/apt.sh
+    ${script_dir}/apt.sh
 
-	#cat > /etc/apt/apt.conf.d/20norecommends <<EOF
-	#APT {
-	#  Install-Recommends "false";
-	#  Install-Suggests "false";
-	#};
-	#EOF
+    #cat > /etc/apt/apt.conf.d/20norecommends <<EOF
+    #APT {
+    #  Install-Recommends "false";
+    #  Install-Suggests "false";
+    #};
+    #EOF
 
-	apt update
+    apt update
     apt -y upgrade
     apt autoremove
 
-	${script_dir}/bin/install_packages.py -c debian_12 -s base
+    ${script_dir}/debian_config/install_packages.py -f ${script_dir}/debian_config/packages.yaml -c debian_12
 
-	systemctl disable rng-tools
-
-    # Test if yadm has alwready cloned the repo
-    if [ -d "$HOME/.config/yadm" ]; then
-        echo "yadm already installed"
-		yadm pull
-	else
-        yadm clone https://manastria@bitbucket.org/manastria/dotfile.git
+    if systemctl is-active --quiet rng-tools; then
+        systemctl disable rng-tools
     fi
-	
-	
-	yadm reset --hard origin/master
+
+
+    yadm_manage
 }
 
 
