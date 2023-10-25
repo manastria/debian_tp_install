@@ -1,0 +1,33 @@
+= RELEASE
+:experimental:
+
+TP 20191214
+  * Bugfix : utilisation de la commande `sl` avec `su`
+  * Installation de `x11-apps` et des polices
+  * Bugfix : génération des clés SSH au premier redémarrage
+  * Autorisation d'exécuter des programmes avec sudo dans l'interface graphique (`xhost +si:localuser:root`)
+
+TP 2019040301
+  * Création de /etc/rc.local avec make_rclocal.sh
+  * DHCP : simplification du fichier de configuration
+  * TFTP
+    * droits du répertoire /srv/tftp
+    * Ajout de l'option create dans le fichier /etc/default/tftpd-hpa
+  * NTP
+    * Configuration pour une utilisation sans Internet avec l'horloge du système comme base de temps
+  * Suppression de lvmetad
+  * installation des paquets
+    * ntpdate
+    * glances
+  * MAJ des proxy
+  * MAJ dotfiles
+
+
+
+CLI beta 20190616
+  * Modification des liens des dépôts Git
+  * Ajout YADM pour l'utilisateur sysadmin
+
+
+pfsense edgand
+  * Création de la zone "edgand.fr"

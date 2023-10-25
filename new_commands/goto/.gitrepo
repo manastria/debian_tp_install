@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/iridakos/goto.git
+	branch = master
+	commit = b7fda54e0817b9cb47e22a78bd00b4571011cf58
+	parent = f7912a694f224364f332a29f8fdfe0b4242b1994
+	method = merge
+	cmdver = 0.4.3
