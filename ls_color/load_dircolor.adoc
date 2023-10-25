@@ -1,0 +1,9 @@
+----
+eval "$(dircolors /etc/DIR_COLORS)"
+----
+
+
+Avec Vivid :
+----
+export LS_COLORS="$(vivid generate molokai)"
+----
