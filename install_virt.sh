@@ -111,22 +111,22 @@ info "arg_v: ${arg_v}"
 info "arg_h: ${arg_h}"
 
 
-	virt_machine=$(systemd-detect-virt)
-	info "virt_machine: ${virt_machine}"
+virt_machine=$(systemd-detect-virt)
+info "virt_machine: ${virt_machine}"
 
-	case ${virt_machine} in
-		oracle)
-			echo "Virtual Box"
-			aptitude install -y dkms
-			;;
-		vmware)
-			echo "VMWare"
-			aptitude install -y open-vm-tools
-			if [[ "${arg_g:?}" = "1" ]]; then
-				aptitude install -y open-vm-tools-desktop
-			fi
-			;;
-		  *)
-    	echo -n "unknown"
-    	;;
-	esac
+case ${virt_machine} in
+  oracle)
+    echo "Virtual Box"
+    ./install_guest_additions.sh
+    ;;
+  vmware)
+    echo "VMWare"
+    aptitude install -y open-vm-tools
+    if [[ "${arg_g:?}" = "1" ]]; then
+      aptitude install -y open-vm-tools-desktop
+    fi
+    ;;
+    *)
+    echo -n "unknown"
+    ;;
+esac

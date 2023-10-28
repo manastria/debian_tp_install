@@ -5,11 +5,21 @@
 real_script_dir=$(readlink -f "$0")
 real_script_dir=$(dirname "${real_script_dir}")
 
+YADM_HELPER="${HOME}/debian_tp_install/yadm_helper.sh"
+
+# Vérification de l'existence du fichier
+if [ ! -f "$YADM_HELPER" ]; then
+    echo "Erreur : $YADM_HELPER n'existe pas."
+    exit 1
+fi
+
+source "$YADM_HELPER"
+
 
 
 printf "\n"
 echo -e "\033[32;1mInstallation des paquets\033[0m"
-${real_script_dir}/bin/install_packages.py -c debian_12 -s basenet tp gpg
+${real_script_dir}/debian_config/install_packages.py -c debian_12 -s basenet tp gpg
 
 
 printf "\n"
@@ -174,5 +184,8 @@ chmod 700 /usr/games/sl
 
 # Environnement de sysadmin
 echo -e "\033[32;1mEnvironnement yadm\033[0m"
-sudo -u sysadmin --set-home yadm clone https://manastria@bitbucket.org/manastria/dotfile.git
-sudo -u sysadmin --set-home yadm reset --hard origin/master
+sudo -H -u sysadmin bash -i <<EOF
+$(declare -f yadm_manage)
+yadm_url="$yadm_url"
+yadm_manage
+EOF

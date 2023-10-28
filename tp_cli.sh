@@ -1,7 +1,6 @@
 #!/usr/bin/bash
 
-./apt.sh
-./baseV10.sh
+./baseV12.sh
 ./install_tp.sh
 ./install_virt.sh
 ./install_eth0.sh
@@ -12,5 +11,3 @@
 tar -x -C / -f ndg_unhatched.tar.bz2
 chown -R sysadmin:sysadmin /home/sysadmin
 ./install_bashtop.sh
-./install_goto.sh
-./install_bat.sh
