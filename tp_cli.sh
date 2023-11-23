@@ -4,7 +4,7 @@
 ./install_tp.sh
 ./install_virt.sh
 ./install_eth0.sh
-#./install_network-manager.sh
+./install_network-manager.sh
 ./make_rclocal.sh
 ./install_issue.sh
 ./ssh_authkey.sh
