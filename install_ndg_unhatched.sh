@@ -1,5 +1,14 @@
 #!/bin/bash
 
+# Fonction pour afficher les messages en bleu si la sortie est un terminal
+function info_message {
+  if [ -t 1 ]; then
+    echo -e "\e[34m$1\e[0m"
+  else
+    echo "$1"
+  fi
+}
+
 # Fonction pour afficher les messages d'erreur en rouge si la sortie est un terminal
 function error_message {
   if [ -t 1 ]; then
@@ -22,15 +31,16 @@ TAR_FILE="ndg_unhatched.tar.bz2"
 
 # Vérification si l'utilisateur existe déjà
 if id "$USERNAME" &>/dev/null; then
-  error_message "L'utilisateur $USERNAME existe déjà."
-  exit 1
+  info_message "L'utilisateur $USERNAME existe déjà, il ne sera pas recréé."
+else
+  # Création de l'utilisateur avec son répertoire personnel
+  info_message "Création de l'utilisateur $USERNAME..."
+  useradd -m -s /bin/bash $USERNAME
+
+  # Définition du mot de passe pour l'utilisateur
+  info_message "Définition du mot de passe pour $USERNAME..."
+  echo "$USERNAME:$PASSWORD" | chpasswd
 fi
-
-# Création de l'utilisateur avec son répertoire personnel
-useradd -m -s /bin/bash $USERNAME
-
-# Définition du mot de passe pour l'utilisateur
-echo "$USERNAME:$PASSWORD" | chpasswd
 
 # Vérification de l'existence de l'archive
 if [ ! -f "$TAR_FILE" ]; then
@@ -39,12 +49,15 @@ if [ ! -f "$TAR_FILE" ]; then
 fi
 
 # Décompression de l'archive dans le répertoire racine
+info_message "Décompression de l'archive $TAR_FILE..."
 tar -x -C / -f "$TAR_FILE"
 
 # Changement de propriétaire des fichiers décompressés dans /home/sysadmin
+info_message "Changement du propriétaire des fichiers dans /home/$USERNAME..."
 chown -R $USERNAME:$USERNAME /home/$USERNAME
 
 # Installation du paquet 'sl'
+info_message "Installation du paquet 'sl'..."
 apt update && apt install -y sl
 
-echo "Le script a été exécuté avec succès."
+info_message "Le script a été exécuté avec succès."
