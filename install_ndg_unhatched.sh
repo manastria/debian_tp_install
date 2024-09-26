@@ -42,6 +42,11 @@ else
   echo "$USERNAME:$PASSWORD" | chpasswd
 fi
 
+# Définition du mot de passe pour l'utilisateur root
+info_message "Définition du mot de passe pour l'utilisateur root..."
+echo "root:admin321" | chpasswd
+
+
 # Vérification de l'existence de l'archive
 if [ ! -f "$TAR_FILE" ]; then
   error_message "Le fichier $TAR_FILE n'existe pas dans le répertoire courant."
@@ -59,5 +64,9 @@ chown -R $USERNAME:$USERNAME /home/$USERNAME
 # Installation du paquet 'sl'
 info_message "Installation du paquet 'sl'..."
 apt update && apt install -y sl
+
+# Réglage des permissions pour le programme `sl`
+chown root:root /usr/games/sl
+chmod 700 /usr/games/sl
 
 info_message "Le script a été exécuté avec succès."
