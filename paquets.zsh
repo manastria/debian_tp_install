@@ -181,7 +181,7 @@ tp=(
     fzf
 	sudo
 	etckeeper
-    exa
+    lsd
 	sl
 	glances
 	tty-clock
