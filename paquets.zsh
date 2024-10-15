@@ -174,23 +174,24 @@ basenet=(
 
 tp=(
 	apt-file
-    bpytop
+	avahi-daemon
 	command-not-found
-#   chkservice
+	dfc
+	etckeeper
+	glances
+	htop
+	libnss-mdns
+	sl
+	sudo
+	tftp-hpa
+	tty-clock
+    bpytop
     fasd
     fzf
-	sudo
-	etckeeper
     lsd
-	sl
-	glances
-	tty-clock
-	htop
-	dfc
+    net-tools
     snapd
-	tftp-hpa
-	avahi-daemon
-	libnss-mdns
+#   chkservice
 )
 
 lamp=(
