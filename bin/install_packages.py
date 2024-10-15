@@ -45,12 +45,10 @@ PACKAGES = {
             get_kernel_headers_package(),
             "lnav",
             "locales-all",
-            "mlocate",
             "most",
             "multitail",
             "parted",
             "reptyr",
-            "rng-tools",
             "screen",
             "screenfetch",
             "neofetch",
@@ -62,7 +60,14 @@ PACKAGES = {
             "yadm",
             "zip",
             "zsh",
-        ]
+        ],
+        "Debian": [
+            "mlocate",
+            "rng-tools",
+        ],
+        "Ubuntu": [
+            "plocate",
+        ],
     },
     "tp": {
         "base": [
