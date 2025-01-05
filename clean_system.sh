@@ -14,9 +14,9 @@
 #apt-get update
 
 
-apt-get autoremove
-apt-get autoclean
-apt-get clean
+apt-get autoremove -y
+apt-get autoclean -y
+apt-get clean -y
 
 
 #Stop services for cleanup
@@ -54,7 +54,7 @@ rm -f /etc/ssh/ssh_host_*
 
 # Nettoyage des lignes spécifiques dans le fichier /etc/rc.local pour éviter des duplications.
 # Suppression des lignes qui vérifient ou régénèrent les clés SSH et le hostname.
-sed -i -e '\|test -f /etc/ssh/ssh_host_dsa_key|d' /etc/rc.local
+sed -i -e '\|test -f /etc/ssh/ssh_host_rsa_key|d' /etc/rc.local
 # Suppression des anciennes vérifications du hostname dans /etc/rc.local
 sed -i -e '\|test -f /etc/hostname|d' /etc/rc.local
 # Suppression des lignes contenant "exit 0" pour pouvoir le repositionner à la fin du script.
@@ -71,7 +71,7 @@ bash -c 'echo "test -f /etc/hostname || ( \
 
 # Ajout d'une commande dans /etc/rc.local pour régénérer les clés SSH si elles n'existent pas.
 # Un log est également ajouté pour confirmer la régénération des clés SSH.
-bash -c 'echo "test -f /etc/ssh/ssh_host_dsa_key || ( \
+bash -c 'echo "test -f /etc/ssh/ssh_host_rsa_key || ( \
   dpkg-reconfigure openssh-server; \
   echo \"\$(date +%Y-%m-%d_%H:%M:%S) SSH keys regenerated.\" >> /var/log/hostname-regenerate.log)" >> /etc/rc.local'
 
