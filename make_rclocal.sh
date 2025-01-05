@@ -53,7 +53,16 @@ if [ -f /etc/do_first_boot ]; then
 
   # 3) Génération d'un nouveau nom d'hôte
   #    (vous pouvez adapter la logique, par ex. un préfixe + suffixe aléatoire)
-  newhost=$(tr -dc 'a-z0-9' < /dev/urandom | head -c 10)
+  newhost="vm-$(tr -dc 'a-z0-9' < /dev/urandom | head -c 10)"
+
+  # Vérification que la variable est bien remplie
+  if [ -z "$newhost" ]; then
+  echo "Erreur : échec de la génération du nom d'hôte." >&2
+  exit 1
+  fi
+
+  echo "Nouveau nom d'hôte généré : $newhost"
+
   hostnamectl set-hostname "$newhost"
 
   # Mise à jour /etc/hosts pour pointer 127.0.1.1 vers le nouveau nom
