@@ -7,6 +7,7 @@ ConditionPathExists=/etc/rc.local
 
 [Service]
 Type=forking
+ExecStartPre=/bin/sleep 3
 ExecStart=/etc/rc.local start
 TimeoutSec=0
 StandardOutput=tty
@@ -14,7 +15,7 @@ RemainAfterExit=yes
 SysVStartPriority=99
 
 [Install]
-WantedBy=idle.target
+WantedBy=multi-user.target
 EOF
 
 cat > /etc/rc.local <<EOF
