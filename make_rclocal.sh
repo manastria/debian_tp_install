@@ -18,7 +18,7 @@ WantedBy=multi-user.target
 EOF
 
 cat > /etc/rc.local <<EOF
-#!/bin/sh -e
+#!/bin/sh
 #
 # rc.local
 #
