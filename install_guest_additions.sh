@@ -2,7 +2,7 @@
 
 # Relancer le script avec sudo si besoin
 if [ "$EUID" -ne 0 ]; then
-    exec sudo "$0" "$@"
+    exec sudo -E bash "$(readlink -f "$0")" "$@"
 fi
 
 set -e  # Arrêter le script à la première erreur
