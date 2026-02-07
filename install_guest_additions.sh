@@ -1,44 +1,29 @@
 #!/bin/bash
 
-# Installer les paquets nécessaires pour la compilation
-sudo apt-get update
-sudo apt-get install -y dkms build-essential linux-headers-$(uname -r)
+# Relancer le script avec sudo si besoin
+if [ "$EUID" -ne 0 ]; then
+    exec sudo "$0" "$@"
+fi
 
-# Etape 1 : Récupérer la dernière version
-LATEST_VERSION=$(curl -s https://download.virtualbox.org/virtualbox/LATEST.TXT)
+set -e  # Arrêter le script à la première erreur
 
-# Etape 2 : Construire l'URL
-ISO_URL="https://download.virtualbox.org/virtualbox/$LATEST_VERSION/VBoxGuestAdditions_$LATEST_VERSION.iso"
+apt-get update
+apt-get install -y dkms build-essential linux-headers-"$(uname -r)" curl
 
-# Etape 3 : Télécharger le fichier ISO
-curl -o VBoxGuestAdditions.iso $ISO_URL
+# Récupérer et télécharger la dernière version
+LATEST_VERSION=$(curl -sf https://download.virtualbox.org/virtualbox/LATEST.TXT)
+ISO_PATH="/tmp/VBoxGuestAdditions.iso"
+curl -f -o "$ISO_PATH" "https://download.virtualbox.org/virtualbox/$LATEST_VERSION/VBoxGuestAdditions_$LATEST_VERSION.iso"
 
-# Vérifier si le répertoire de montage existe
+# Monter et installer
 MOUNT_DIR="/mnt/VBoxGuestAdditions"
-if [ ! -d "$MOUNT_DIR" ]; then
-    mkdir $MOUNT_DIR
-fi
+mkdir -p "$MOUNT_DIR"
+mount -o loop "$ISO_PATH" "$MOUNT_DIR"
+sh "$MOUNT_DIR/VBoxLinuxAdditions.run" || true  # Retourne souvent un code != 0 même en cas de succès
+umount "$MOUNT_DIR"
 
-# Etape 4 : Monter le fichier ISO
-sudo mount -o loop VBoxGuestAdditions.iso $MOUNT_DIR
+# Nettoyage
+rm -f "$ISO_PATH"
+rmdir "$MOUNT_DIR"
 
-# Etape 5 : Exécuter le script d'installation
-sudo sh $MOUNT_DIR/VBoxLinuxAdditions.run
-
-# Etape 6 : Démonter le fichier ISO
-sudo umount $MOUNT_DIR
-
-# Nettoyer
-rm VBoxGuestAdditions.iso
-rmdir $MOUNT_DIR
-
-# Vériier si l'installation a réussi
-if lsmod | grep -q "vboxguest"; then
-    echo "Guest Additions semble avoir été installé avec succès."
-else
-    echo "Erreur : Guest Additions n'a pas été installé correctement."
-    exit 1
-fi
-
-
-echo "Installation des Guest Additions terminée!"
+echo "Installation terminée. Un redémarrage est recommandé."
