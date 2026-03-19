@@ -3,6 +3,14 @@
 # install_guest_additions.sh
 # Installation des VirtualBox Guest Additions pour XUbuntu
 # Gère : driver graphique, presse-papier partagé, drag-and-drop, dossiers partagés
+# Usage :
+#   ./install_guest_additions.sh
+#     Détecte automatiquement la version cible des Guest Additions.
+#   ./install_guest_additions.sh --version X.Y.Z
+#     Force l'installation d'une version précise des Guest Additions.
+# Prérequis :
+#   - Exécuter le script dans une VM VirtualBox sous Debian/XUbuntu.
+#   - Une connexion Internet est nécessaire pour télécharger l'ISO.
 # =============================================================================
 
 set -euo pipefail
