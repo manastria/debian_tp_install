@@ -86,23 +86,24 @@ info "Version cible des Guest Additions : ${GREEN}$VBOX_VERSION${NC}"
 # =============================================================================
 # 2. Dépendances système
 # =============================================================================
+info "Suppression des Guest Additions du dépôt Ubuntu si présentes..."
+apt-get purge -y \
+    virtualbox-guest-utils \
+    virtualbox-guest-x11 \
+    virtualbox-guest-dkms \
+    2>/dev/null || true
+apt-get autoremove -y --purge 2>/dev/null || true
+
 info "Mise à jour des paquets et installation des dépendances..."
 apt-get update -q
 
-# Dépendances de compilation des modules kernel
+# Dépendances de compilation des modules kernel uniquement
 apt-get install -y --no-install-recommends \
     dkms \
     build-essential \
     linux-headers-"$(uname -r)" \
     curl \
     wget
-
-# Dépendances pour le support graphique, presse-papier et drag-and-drop
-# virtualbox-guest-x11 : driver vboxvideo + intégration X11 (clipboard, D&D)
-# xserver-xorg-video-vmware est parfois en conflit, on s'assure de l'exclusion
-apt-get install -y --no-install-recommends \
-    virtualbox-guest-x11 \
-    || warning "Paquet virtualbox-guest-x11 indisponible depuis les dépôts — les GA compilées prendront le relais."
 
 success "Dépendances installées."
 
