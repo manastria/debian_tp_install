@@ -1,11 +1,14 @@
 #!/bin/bash
 
+if [ "$(id -u)" -ne 0 ]; then
+    exec sudo "$(readlink -f "$0")" "$@"
+fi
 
 # Chemin réel du script
 real_script_dir=$(readlink -f "$0")
 real_script_dir=$(dirname "${real_script_dir}")
 
-YADM_HELPER="${HOME}/debian_tp_install/yadm_helper.sh"
+YADM_HELPER="${real_script_dir}/yadm_helper.sh"
 
 # Vérification de l'existence du fichier
 if [ ! -f "$YADM_HELPER" ]; then
@@ -91,7 +94,11 @@ printf "\n"
 # APTAPTFILE
 printf "\n"
 echo -e "\033[32;1mConfiguration de apt-file\033[0m"
-apt-file update
+if command -v apt-file > /dev/null 2>&1; then
+    apt-file update
+else
+    echo "INFO: apt-file non installé, mise à jour ignorée."
+fi
 printf "\n"
 # read -p "Press key to continue.. " -n1 -s
 
@@ -127,8 +134,12 @@ fi
 
 
 # Pour le TP linuxunhatched
-chown root:root /usr/games/sl
-chmod 700 /usr/games/sl
+if [ -f /usr/games/sl ]; then
+    chown root:root /usr/games/sl
+    chmod 700 /usr/games/sl
+else
+    echo "INFO: /usr/games/sl non trouvé, configuration ignorée."
+fi
 
 
 # Environnement de sysadmin
