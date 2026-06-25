@@ -97,83 +97,32 @@ printf "\n"
 
 # SUDO
 printf "\n"
-echo -e "\033[32;1mConfiguration de sudo\033[0m"
-cat > /etc/sudoers.d/admins << EOF
-Defaults        env_keep += "HOME"
-
-# Ajouter sammy comme administrateur
-# usermod -aG admins sammy
-
-%adminpwd     ALL=(ALL:ALL)   PASSWD: ALL
-%admins        ALL=(ALL:ALL)   NOPASSWD: ALL
-EOF
-chown root:root /etc/sudoers.d/admins
-chmod 0440 /etc/sudoers.d/admins
-
-cat > /etc/sudoers.d/sshagent << EOF
-Defaults        env_keep += "SSH_AUTH_SOCK"
-EOF
-chown root:root /etc/sudoers.d/sshagent
-chmod 0440 /etc/sudoers.d/sshagent
+"${real_script_dir}/configure-sudo.sh"
 
 
-cat > /etc/sudoers << EOF
-#
-# This file MUST be edited with the 'visudo' command as root.
-#
-# Please consider adding local content in /etc/sudoers.d/ instead of
-# directly modifying this file.
-#
-# See the man page for details on how to write a sudoers file.
-#
-Defaults        env_reset
-Defaults        mail_badpass
-Defaults        secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games"
-
-# Host alias specification
-
-# User alias specification
-
-# Cmnd alias specification
-
-# User privilege specification
-root    ALL=(ALL:ALL) ALL
-
-# Allow members of group sudo to execute any command
-%sudo   ALL=(ALL:ALL) ALL
-
-# See sudoers(5) for more information on "#include" directives:
-
-#includedir /etc/sudoers.d
-
-Defaults env_keep+="DISPLAY"
-# Defaults env_keep="XAUTHORIZATION XAUTHORITY TZ PS2 PS1 PATH LS_COLORS KRB5CCNAME HOSTNAME HOME DISPLAY COLORS"
-EOF
-chown root:root /etc/sudoers
-chmod 0440 /etc/sudoers
-
-
-
+# GROUPES ET UTILISATEURS
 printf "\n"
-echo -e "\033[32;1mConfiguration des groupes\033[0m"
-if ! id -u sysadmin > /dev/null 2>&1
-then
-	useradd -m -p netlab123 sysadmin
+echo -e "\033[32;1mConfiguration des groupes et utilisateurs\033[0m"
+
+if ! getent group admins > /dev/null 2>&1; then
+    groupadd admins
+    echo "Groupe 'admins' créé."
 fi
 
-if ! getent group admins > /dev/null 2>&1
-then
-	groupadd admins
+if ! getent group adminpwd > /dev/null 2>&1; then
+    groupadd adminpwd
+    echo "Groupe 'adminpwd' créé."
 fi
 
-if ! getent group adminpwd > /dev/null 2>&1
-then
-	groupadd adminpwd
+if ! id -u sysadmin > /dev/null 2>&1; then
+    useradd -m -s /bin/bash sysadmin
+    echo "sysadmin:netlab123" | chpasswd
+    echo "Utilisateur 'sysadmin' créé avec son mot de passe."
 fi
 
-if ! id -Gn sysadmin | grep '\badmins\b' > /dev/null 2>&1
-then
-	usermod -aG adminpwd sysadmin
+if ! id -Gn sysadmin | grep '\badminpwd\b' > /dev/null 2>&1; then
+    usermod -aG adminpwd sysadmin
+    echo "sysadmin ajouté au groupe adminpwd."
 fi
 
 

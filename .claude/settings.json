@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git mv *)",
+      "Bash(git -C /home/jpdemory/projets/debian_tp_install status sudo.sh)"
+    ]
+  }
+}
