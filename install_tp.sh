@@ -22,6 +22,7 @@ source "$YADM_HELPER"
 
 printf "\n"
 echo -e "\033[32;1mInstallation des paquets\033[0m"
+apt-get install -y python3-yaml python3-apt > /dev/null
 ${real_script_dir}/debian_config/install_packages.py -c debian_12 -s basenet tp gpg
 
 
@@ -87,7 +88,11 @@ EOF
 printf "\n"
 echo -e "\033[32;1mConfiguration de command-not-found\033[0m"
 apt update
-/usr/sbin/update-command-not-found
+if [ -x /usr/sbin/update-command-not-found ]; then
+    /usr/sbin/update-command-not-found
+else
+    echo "INFO: update-command-not-found non disponible, ignoré."
+fi
 printf "\n"
 # read -p "Press key to continue.. " -n1 -s
 
@@ -144,7 +149,7 @@ fi
 
 # Environnement de sysadmin
 echo -e "\033[32;1mEnvironnement yadm\033[0m"
-sudo -H -u sysadmin bash -i <<EOF
+sudo -H -u sysadmin bash <<EOF
 $(declare -f yadm_manage)
 yadm_url="$yadm_url"
 yadm_manage

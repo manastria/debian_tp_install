@@ -10,5 +10,5 @@ yadm_manage() {
         yadm clone $yadm_url
     fi
 
-    yadm reset --hard origin/master
+    yadm reset --hard origin/HEAD
 }
