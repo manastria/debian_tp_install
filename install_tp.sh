@@ -116,16 +116,6 @@ printf "\n"
 printf "\n"
 echo -e "\033[32;1mConfiguration des groupes et utilisateurs\033[0m"
 
-if ! getent group admins > /dev/null 2>&1; then
-    groupadd admins
-    echo "Groupe 'admins' créé."
-fi
-
-if ! getent group adminpwd > /dev/null 2>&1; then
-    groupadd adminpwd
-    echo "Groupe 'adminpwd' créé."
-fi
-
 if ! id -u sysadmin > /dev/null 2>&1; then
     useradd -m -s /bin/bash sysadmin
     echo "sysadmin:netlab123" | chpasswd
