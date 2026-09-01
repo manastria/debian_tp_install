@@ -3,9 +3,27 @@
 # ==============================================================================
 # SCRIPT DE NETTOYAGE FINAL POUR TEMPLATE DEBIAN
 # ==============================================================================
-# ATTENTION : Ce script nettoie en profondeur la VM (logs, cache, historique,
-# identifiants uniques) en vue de son clonage.
+# Ce script prépare la VM en vue de son clonage.
 # Il doit être la dernière opération effectuée avant l'extinction.
+#
+# --- DEUX MODES DE NETTOYAGE ---
+#
+# Mode LÉGER (par défaut) : uniquement ce qui est nécessaire à l'unicité des
+# clones (clés d'hôte SSH, machine-id, cloud-init si disponible/installable,
+# réinitialisation au prochain démarrage) et l'effacement de l'historique.
+# Ne touche ni au cache APT, ni aux logs, ni aux fichiers temporaires.
+# Sécurité : les clés SSH ne sont supprimées que si un mécanisme de
+# régénération au démarrage est confirmé disponible (cloud-init installé,
+# ou make_rclocal.sh déjà exécuté) — sinon la VM deviendrait inaccessible
+# en SSH au prochain démarrage.
+#
+# Mode COMPLET (optionnel) : ajoute en plus le nettoyage du cache APT, des
+# logs système (rsyslog/journald) et des répertoires temporaires. À activer
+# via :
+#     CLEAN_SYSTEM_FULL_CLEAN=1 source /chemin/vers/ce/script.sh
+#
+# En cas de dysfonctionnement constaté sur certaines VMs après un nettoyage
+# complet, restez en mode léger (par défaut) le temps d'identifier la cause.
 #
 # --- PROCÉDURE D'UTILISATION STRICTE ---
 # Pour garantir une propreté parfaite sans laisser de traces (historique),
@@ -127,6 +145,11 @@ if [[ "${CLEAN_SYSTEM_DEBUG}" == "1" ]]; then
     trap clean_system_debug_cleanup ERR
 fi
 
+# --- Mode de nettoyage complet (optionnel, désactivé par défaut) ---
+# CLEAN_SYSTEM_FULL_CLEAN=1 source clean_system.sh pour activer en plus le
+# nettoyage APT/logs/tmp/udev (voir en-tête du fichier).
+CLEAN_SYSTEM_FULL_CLEAN="${CLEAN_SYSTEM_FULL_CLEAN:-0}"
+
 # --- Couleurs optionnelles pour l'affichage ---
 CLEAN_SYSTEM_COLOR_RESET=""
 CLEAN_SYSTEM_COLOR_INFO=""
@@ -176,6 +199,17 @@ clean_system_error() {
     fi
 }
 
+# Vérifie que make_rclocal.sh a bien été exécuté sur cette VM : /etc/rc.local
+# doit contenir la logique de réinitialisation (do_first_boot) et le service
+# rc-local.service doit être activé. Sans ça, planter /etc/do_first_boot ou
+# supprimer les clés SSH en comptant sur ce relais serait sans effet.
+clean_system_rc_local_ready() {
+    [ -x /etc/rc.local ] || return 1
+    grep -q "do_first_boot" /etc/rc.local 2>/dev/null || return 1
+    systemctl is-enabled --quiet rc-local.service 2>/dev/null || return 1
+    return 0
+}
+
 # --- Gardes-fous ---
 
 # 1. Vérifier si le script est sourcé.
@@ -195,57 +229,14 @@ if [[ "$(id -u)" -ne 0 ]]; then
 fi
 
 clean_system_info "--- Démarrage du nettoyage de la VM ---"
-
-# --- 1. Nettoyage du gestionnaire de paquets APT ---
-clean_system_info "[+] Nettoyage du cache APT..."
-apt-get autoremove -y
-apt-get autoclean -y
-apt-get clean -y
-
-# --- 2. Nettoyage des logs ---
-clean_system_info "[+] Nettoyage des logs système (rsyslog et journald)..."
-
-# Arrêt du service de logging pour éviter de nouveaux logs pendant le nettoyage
-if systemctl is-active --quiet rsyslog; then
-    clean_system_info "Le service rsyslog est actif, arrêt en cours..."
-    systemctl stop rsyslog
+if [[ "${CLEAN_SYSTEM_FULL_CLEAN}" == "1" ]]; then
+    clean_system_info "Mode complet activé (CLEAN_SYSTEM_FULL_CLEAN=1) : APT, logs, tmp et udev inclus."
 else
-    clean_system_info "Info : Le service rsyslog n'est pas installé ou est déjà inactif."
+    clean_system_info "Mode léger (par défaut) : APT, logs, tmp et udev ne seront PAS touchés."
+    clean_system_info "-> CLEAN_SYSTEM_FULL_CLEAN=1 source ... pour activer le nettoyage complet."
 fi
 
-# Nettoyage des logs traditionnels (/var/log)
-# Utilisation de find pour être plus précis et efficace
-find /var/log -type f -name "*.log" -exec truncate -s 0 {} \;
-find /var/log -type f -name "*.gz" -delete
-find /var/log -type f -name "*.1" -delete
-truncate -s 0 /var/log/btmp
-truncate -s 0 /var/log/dmesg
-truncate -s 0 /var/log/lastlog
-rm -rf /var/log/apt/*
-
-# Nettoyage du journal systemd (très important !)
-journalctl --rotate
-journalctl --vacuum-time=1s
-
-# --- 3. Nettoyage des fichiers temporaires ---
-clean_system_info "[+] Nettoyage des répertoires temporaires..."
-find /tmp -mindepth 1 -delete
-find /var/tmp -mindepth 1 -delete
-
-# --- 4. Généralisation de la VM pour le clonage ---
-
-# Nettoyage des règles réseau persistantes (évite les conflits de nom d'interface)
-clean_system_info "[+] Suppression des règles udev..."
-if [ -f /etc/udev/rules.d/70-persistent-net.rules ]; then
-    rm -f /etc/udev/rules.d/70-persistent-net.rules
-fi
-
-# Suppression des clés d'hôte SSH (sécurité)
-# Elles seront régénérées au prochain démarrage par le service SSH.
-clean_system_info "[+] Suppression des clés d'hôte SSH..."
-rm -f /etc/ssh/ssh_host_*_key*
-
-# Réinitialisation du machine-id (essentiel pour l'unicité des clones)
+# --- 1. Réinitialisation du machine-id (essentiel pour l'unicité des clones) ---
 clean_system_info "[+] Réinitialisation du machine-id..."
 truncate -s 0 /etc/machine-id
 if [ -f /var/lib/dbus/machine-id ]; then
@@ -253,20 +244,63 @@ if [ -f /var/lib/dbus/machine-id ]; then
     ln -s /etc/machine-id /var/lib/dbus/machine-id
 fi
 
-# Utilisation de cloud-init pour la généralisation (approche moderne)
-# Si cloud-init est installé, c'est la méthode recommandée pour gérer la
-# configuration au premier démarrage (hostname, clés SSH, etc.).
+# --- 2. cloud-init pour la généralisation (approche moderne) ---
+# cloud-init sait régénérer proprement clés SSH/hostname/réseau au premier
+# démarrage. On l'installe s'il est absent, en mode best-effort : l'absence
+# de réseau ne doit pas faire échouer le reste du script.
+CLEAN_SYSTEM_CLOUD_INIT_OK=0
+if ! command -v cloud-init &> /dev/null; then
+    clean_system_info "[+] cloud-init absent, tentative d'installation..."
+    if apt-get update -qq > /dev/null 2>&1 && apt-get install -y cloud-init > /dev/null 2>&1; then
+        clean_system_success "cloud-init installé."
+    else
+        clean_system_warn "Installation de cloud-init impossible (pas de réseau ?), étape ignorée."
+    fi
+fi
+
 if command -v cloud-init &> /dev/null; then
+    CLEAN_SYSTEM_CLOUD_INIT_OK=1
+    # Sur une VM sans service de métadonnées cloud (VirtualBox), forcer le
+    # datasource "None" : sans cela, cloud-init sonde AWS/Azure/GCE/... au
+    # démarrage, ce qui ralentit le boot, voire se désactive faute de réponse.
+    if [ ! -f /etc/cloud/cloud.cfg.d/99-datasource-none.cfg ]; then
+        cat > /etc/cloud/cloud.cfg.d/99-datasource-none.cfg <<'EOF'
+datasource_list: [ None ]
+EOF
+    fi
     clean_system_info "[+] Nettoyage de cloud-init..."
     cloud-init clean --logs --seed
 fi
 
-# --- 5. Préparation pour la réinitialisation au prochain démarrage ---
-# La présence de ce fichier déclenche la réinitialisation du nom d’hôte et des clés SSH au prochain démarrage via /etc/rc.local
-clean_system_info "[+] Création du fichier /etc/do_first_boot pour réinitialisation au prochain démarrage..."
-touch /etc/do_first_boot
+# --- 3. Réinitialisation au prochain démarrage via /etc/rc.local ---
+# La présence de /etc/do_first_boot déclenche la réinitialisation du nom
+# d'hôte et des clés SSH au prochain démarrage, via /etc/rc.local. On vérifie
+# que make_rclocal.sh a bien été exécuté avant de s'y fier : sinon le flag
+# planté ici ne serait jamais consommé.
+CLEAN_SYSTEM_RC_LOCAL_OK=0
+if clean_system_rc_local_ready; then
+    CLEAN_SYSTEM_RC_LOCAL_OK=1
+    clean_system_info "[+] Création du fichier /etc/do_first_boot pour réinitialisation au prochain démarrage..."
+    touch /etc/do_first_boot
+else
+    clean_system_warn "[!] /etc/rc.local ne semble pas prêt (make_rclocal.sh a-t-il été exécuté ?)."
+    clean_system_warn "    /etc/do_first_boot n'est pas créé : le hostname ne sera pas réinitialisé par ce relais."
+fi
 
-# --- 6. Nettoyage de l'historique Shell (LA solution à votre problème) ---
+# --- 4. Suppression des clés d'hôte SSH (sécurité) ---
+# On ne supprime les clés que si un mécanisme de régénération au démarrage
+# est confirmé (cloud-init ou rc.local + do_first_boot) : sinon la VM se
+# retrouverait sans clé SSH, donc inaccessible en SSH au prochain démarrage.
+if [[ "${CLEAN_SYSTEM_CLOUD_INIT_OK}" -eq 1 || "${CLEAN_SYSTEM_RC_LOCAL_OK}" -eq 1 ]]; then
+    clean_system_info "[+] Suppression des clés d'hôte SSH..."
+    rm -f /etc/ssh/ssh_host_*_key*
+else
+    clean_system_warn "[!] Aucun mécanisme de régénération SSH confirmé (ni cloud-init, ni rc.local)."
+    clean_system_warn "    Clés d'hôte SSH CONSERVÉES pour ne pas rendre la VM inaccessible en SSH."
+    clean_system_warn "    -> Lancez make_rclocal.sh (ou assurez un accès réseau pour cloud-init), puis relancez ce script."
+fi
+
+# --- 5. Nettoyage de l'historique Shell (LA solution à votre problème) ---
 clean_system_info "[+] Effacement de l'historique shell..."
 
 # Efface l'historique de la session courante en mémoire
@@ -281,9 +315,60 @@ find /root /home -type f -name ".*_history" -delete
 # ne sera écrit.
 unset HISTFILE
 
+# --- 6. Nettoyage complet (optionnel, CLEAN_SYSTEM_FULL_CLEAN=1) ---
+if [[ "${CLEAN_SYSTEM_FULL_CLEAN}" == "1" ]]; then
+
+    # Nettoyage du gestionnaire de paquets APT
+    clean_system_info "[+] Nettoyage du cache APT..."
+    apt-get autoremove -y
+    apt-get autoclean -y
+    apt-get clean -y
+
+    # Nettoyage des logs
+    clean_system_info "[+] Nettoyage des logs système (rsyslog et journald)..."
+
+    # Arrêt du service de logging pour éviter de nouveaux logs pendant le nettoyage
+    if systemctl is-active --quiet rsyslog; then
+        clean_system_info "Le service rsyslog est actif, arrêt en cours..."
+        systemctl stop rsyslog
+    else
+        clean_system_info "Info : Le service rsyslog n'est pas installé ou est déjà inactif."
+    fi
+
+    # Nettoyage des logs traditionnels (/var/log)
+    # Utilisation de find pour être plus précis et efficace
+    find /var/log -type f -name "*.log" -exec truncate -s 0 {} \;
+    find /var/log -type f -name "*.gz" -delete
+    find /var/log -type f -name "*.1" -delete
+    truncate -s 0 /var/log/btmp
+    truncate -s 0 /var/log/dmesg
+    truncate -s 0 /var/log/lastlog
+    rm -rf /var/log/apt/*
+
+    # Nettoyage du journal systemd (très important !)
+    journalctl --rotate
+    journalctl --vacuum-time=1s
+
+    # Nettoyage des fichiers temporaires
+    clean_system_info "[+] Nettoyage des répertoires temporaires..."
+    find /tmp -mindepth 1 -delete
+    find /var/tmp -mindepth 1 -delete
+
+    # Nettoyage des règles réseau persistantes (évite les conflits de nom d'interface)
+    clean_system_info "[+] Suppression des règles udev..."
+    if [ -f /etc/udev/rules.d/70-persistent-net.rules ]; then
+        rm -f /etc/udev/rules.d/70-persistent-net.rules
+    fi
+else
+    clean_system_info "[i] Nettoyage complet ignoré (APT, logs, tmp, udev)."
+fi
+
 # --- Finalisation ---
 printf '\n'
 clean_system_success "✅ Nettoyage terminé !"
+if [[ "${CLEAN_SYSTEM_FULL_CLEAN}" != "1" ]]; then
+    clean_system_info "(mode léger : APT, logs, tmp et udev non touchés — CLEAN_SYSTEM_FULL_CLEAN=1 pour un nettoyage complet)"
+fi
 clean_system_action "========================================================================"
 clean_system_action "ACTION REQUISE :"
 clean_system_action "Arrêtez la VM MAINTENANT sans vous déconnecter avec la commande :"
