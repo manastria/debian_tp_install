@@ -13,6 +13,9 @@ La structure imposée pour chaque page est décrite dans
 ## Pages de scripts
 
 - [`configure-sudo.sh`](configure-sudo.md) — groupes sudo de labo (`adminpwd` avec mot de passe, `admins` sans).
+- [`install_eth0.sh`](install_eth0.md) — noms d'interfaces classiques (`eth0`) via `net.ifnames=0` dans GRUB, sur Debian.
+- [`install_network-manager.sh`](install_network-manager.md) — bascule du réseau Debian d'ifupdown vers NetworkManager.
+- [`install_virt.sh`](install_virt.md) — outils invité selon l'hyperviseur détecté (VirtualBox, VMware).
 - [`make_rclocal.sh`](make_rclocal.md) — relais `rc.local` de réinitialisation au premier démarrage d'un clone.
 - [`prepare-ova-export.sh`](prepare-ova-export.md) — nettoyage complet, zerofill et armement du relais avant export en `.ova`.
 

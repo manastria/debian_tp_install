@@ -1,132 +1,210 @@
 #!/usr/bin/env bash
+# =============================================================================
+# NAME
+#     install_virt.sh — Installe les outils invité de l'hyperviseur détecté
+#
+# SYNOPSIS
+#     ./install_virt.sh [-g|--desktop] [-h|--help]
+#
+# DESCRIPTION
+#     Détecte l'hyperviseur avec systemd-detect-virt et installe les outils
+#     invité correspondants :
+#
+#       - VirtualBox (« oracle ») : délègue à install_guest_additions.sh,
+#         situé dans le même répertoire.
+#       - VMware : paquet open-vm-tools, plus open-vm-tools-desktop si
+#         l'option --desktop est donnée.
+#
+#     Sur une machine physique ou un hyperviseur non pris en charge, le
+#     script n'installe rien et sort en succès : il est conçu pour être
+#     enchaîné sans condition dans tp_cli.sh. Idempotent : les paquets déjà
+#     installés ne sont pas réinstallés.
+#
+# OPTIONS
+#     -g, --desktop  Ajoute open-vm-tools-desktop sur une VM VMware (session
+#                    graphique : presse-papier partagé, redimensionnement).
+#                    Sans effet sur les autres hyperviseurs.
+#     -h, --help     Affiche cette aide et quitte.
+#
+# EXAMPLES
+#     sudo ./install_virt.sh
+#         Installe les outils invité adaptés à la VM courante.
+#
+#     sudo ./install_virt.sh --desktop
+#         Idem, avec les extras graphiques VMware.
+#
+# FILES
+#     /var/log/tp-install/install_virt.log   Trace persistante des exécutions.
+#
+# EXIT CODES
+#     0   Succès, hyperviseur non pris en charge, ou machine physique.
+#     1   Option inconnue, systemd-detect-virt absent, install_guest_additions.sh
+#         introuvable, ou échec de l'installation des paquets.
+# =============================================================================
+set -euo pipefail
 
-# LOG_LEVEL
-#    7 = debug
-#    6 = info
-#    5 = notice
-#    4 = warning
-#    3 = error
-#    2 = critical
-#    1 = alert
-#    0 = emergency
-LOG_LEVEL="${LOG_LEVEL:-4}"
+# -----------------------------------------------------------------------------
+# Constantes
+# -----------------------------------------------------------------------------
+# Chemin absolu, résolu depuis celui du script : l'ancienne version appelait
+# « ./install_guest_additions.sh » et échouait dès qu'on ne la lançait pas
+# depuis le répertoire du dépôt.
+readonly GUEST_ADDITIONS_SCRIPT="$(dirname "$(readlink -f "$0")")/install_guest_additions.sh"
 
-function emergency () {                                __b3bp_log emergency "${@}"; exit 1; }
-function alert ()     { [[ "${LOG_LEVEL:-0}" -ge 1 ]] && __b3bp_log alert "${@}"; true; }
-function critical ()  { [[ "${LOG_LEVEL:-0}" -ge 2 ]] && __b3bp_log critical "${@}"; true; }
-function error ()     { [[ "${LOG_LEVEL:-0}" -ge 3 ]] && __b3bp_log error "${@}"; true; }
-function warning ()   { [[ "${LOG_LEVEL:-0}" -ge 4 ]] && __b3bp_log warning "${@}"; true; }
-function notice ()    { [[ "${LOG_LEVEL:-0}" -ge 5 ]] && __b3bp_log notice "${@}"; true; }
-function info ()      { [[ "${LOG_LEVEL:-0}" -ge 6 ]] && __b3bp_log info "${@}"; true; }
-function debug ()     { [[ "${LOG_LEVEL:-0}" -ge 7 ]] && __b3bp_log debug "${@}"; true; }
+DESKTOP=0
 
-# shellcheck disable=SC2034
-read -r -d '' __usage <<-'EOF' || true # exits non-zero when EOF encountered
-  -v               Enable verbose mode, print script as it is executed
-  -d --debug       Enables debug mode
-  -h --help        This page
-  -n --no-color    Disable color output
-  -g --desktop     Installe desktop addons
-EOF
+# -----------------------------------------------------------------------------
+# Couleurs et fonctions de log
+# -----------------------------------------------------------------------------
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+RESET='\033[0m'
 
-# shellcheck disable=SC2034
-read -r -d '' __helptext <<-'EOF' || true # exits non-zero when EOF encountered
- This is Bash3 Boilerplate's help text. Feel free to add any description of your
- program or elaborate more on command-line arguments. This section is not
- parsed and will be added as-is to the help.
-EOF
+info()    { echo -e "${CYAN}[INFO]${RESET}      $*"; }
+success() { echo -e "${GREEN}[OK]${RESET}        $*"; }
+warn()    { echo -e "${YELLOW}[ATTENTION]${RESET} $*"; }
+error()   { echo -e "${RED}[ERREUR]${RESET}    $*" >&2; }
+die()     { error "$*"; exit 1; }
 
-# shellcheck source=main.sh
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/main.sh"
+# -----------------------------------------------------------------------------
+# Trace persistante (/var/log/tp-install)
+# -----------------------------------------------------------------------------
+readonly LOG_DIR="/var/log/tp-install"
+readonly LOG_FILE="${LOG_DIR}/$(basename "$0" .sh).log"
 
-### Signal trapping and backtracing
-##############################################################################
+setup_logging() {
+    install -d -m 0750 -o root -g adm "$LOG_DIR"
+    [ -e "$LOG_FILE" ] || install -m 0640 -o root -g adm /dev/null "$LOG_FILE"
 
-function __b3bp_cleanup_before_exit () {
-  info "Cleaning up. Done"
+    # Sauvegarde des descripteurs d'origine, pour les restaurer en fin de script.
+    exec 3>&1 4>&2
+
+    # Tout ce que produit le script — y compris apt et install_guest_additions.sh
+    # — part à l'écran ET dans le fichier, débarrassé des séquences ANSI qui le
+    # rendraient illisible dans un éditeur.
+    exec > >(tee >(sed -u 's/\x1b\[[0-9;]*m//g' >> "$LOG_FILE")) 2>&1
+    _TEE_PID=$!
+
+    # Le trap n'est posé qu'une fois la redirection active, pour ne pas tenter de
+    # restaurer des descripteurs jamais dupliqués (ex. chemin -h/--help).
+    trap cleanup EXIT
+
+    echo "===== $(date '+%F %T') | $(basename "$0") $* | $(id -un)@$(uname -n) ====="
 }
-trap __b3bp_cleanup_before_exit EXIT
 
-# requires `set -o errtrace`
-__b3bp_err_report() {
-    local error_code=${?}
-    # shellcheck disable=SC2154
-    error "Error in ${__file} in function ${1} on line ${2}"
-    exit ${error_code}
+cleanup() {
+    exec 1>&3 2>&4
+    wait "$_TEE_PID" 2>/dev/null
 }
-# Uncomment the following line for always providing an error backtrace
-# trap '__b3bp_err_report "${FUNCNAME:-.}" ${LINENO}' ERR
 
+# -----------------------------------------------------------------------------
+# Argument parsing
+# -----------------------------------------------------------------------------
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -g|--desktop) DESKTOP=1; shift ;;
+    -h|--help)    sed -n '2,/^# =\{10,\}$/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) die "Option inconnue : $1 (voir -h)" ;;
+  esac
+done
 
-### Command-line argument switches (like -d for debugmode, -h for showing helppage)
-##############################################################################
-
-# debug mode
-if [[ "${arg_d:?}" = "1" ]]; then
-  set -o xtrace
-  PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
-  LOG_LEVEL="7"
-  # Enable error backtracing
-  trap '__b3bp_err_report "${FUNCNAME:-.}" ${LINENO}' ERR
+# -----------------------------------------------------------------------------
+# Élévation de privilèges (Tier 1 — opérations exclusivement système)
+# -----------------------------------------------------------------------------
+if [ "$(id -u)" -ne 0 ]; then
+    exec sudo "$(readlink -f "$0")" "$@"
 fi
 
-# verbose mode
-if [[ "${arg_v:?}" = "1" ]]; then
-  set -o verbose
-fi
+# Tier 1 : le script tourne en root, apt ne doit poser aucune question.
+export DEBIAN_FRONTEND=noninteractive
 
-# no color mode
-if [[ "${arg_n:?}" = "1" ]]; then
-  NO_COLOR="true"
-fi
+# -----------------------------------------------------------------------------
+# Détection de l'hyperviseur
+# -----------------------------------------------------------------------------
+detect_hypervisor() {
+    command -v systemd-detect-virt >/dev/null 2>&1 \
+        || die "systemd-detect-virt introuvable (paquet systemd)."
 
-# help mode
-if [[ "${arg_h:?}" = "1" ]]; then
-  # Help exists with code 1
-  help "Help using ${0}"
-fi
+    # systemd-detect-virt sort en code 1 quand il ne détecte aucune
+    # virtualisation, tout en affichant « none » : sans le « || true », set -e
+    # interromprait le script sur une machine physique, cas parfaitement normal.
+    systemd-detect-virt || true
+}
 
+# -----------------------------------------------------------------------------
+# Installation des paquets
+# -----------------------------------------------------------------------------
+# Installe les paquets manquants parmi ceux passés en argument, et ne fait rien
+# si tous sont déjà là — un « apt-get update » coûte plus cher que le test.
+install_packages() {
+    local -a missing=()
+    local pkg
 
-### Validation. Error out if the things required for your script are not present
-##############################################################################
+    for pkg in "$@"; do
+        if dpkg -s "$pkg" >/dev/null 2>&1; then
+            info "$pkg déjà installé."
+        else
+            missing+=("$pkg")
+        fi
+    done
 
-[[ "${LOG_LEVEL:-}" ]] || emergency "Cannot continue without LOG_LEVEL. "
-
-
-### Runtime
-##############################################################################
-
-# shellcheck disable=SC2154
-info "__i_am_main_script: ${__i_am_main_script}"
-# shellcheck disable=SC2154
-info "__file: ${__file}"
-# shellcheck disable=SC2154
-info "__dir: ${__dir}"
-# shellcheck disable=SC2154
-info "__base: ${__base}"
-info "OSTYPE: ${OSTYPE}"
-
-info "arg_d: ${arg_d}"
-info "arg_v: ${arg_v}"
-info "arg_h: ${arg_h}"
-
-
-virt_machine=$(systemd-detect-virt)
-info "virt_machine: ${virt_machine}"
-
-case ${virt_machine} in
-  oracle)
-    echo "Virtual Box"
-    ./install_guest_additions.sh
-    ;;
-  vmware)
-    echo "VMWare"
-    aptitude install -y open-vm-tools
-    if [[ "${arg_g:?}" = "1" ]]; then
-      aptitude install -y open-vm-tools-desktop
+    if [ ${#missing[@]} -eq 0 ]; then
+        return 0
     fi
-    ;;
-    *)
-    echo -n "unknown"
-    ;;
-esac
+
+    info "Installation de : ${missing[*]}"
+    apt-get update -q || die "Échec de « apt-get update »."
+    apt-get install -y "${missing[@]}" || die "Échec de l'installation de : ${missing[*]}"
+    success "Installé : ${missing[*]}"
+}
+
+install_virtualbox_tools() {
+    [ -x "$GUEST_ADDITIONS_SCRIPT" ] \
+        || die "$GUEST_ADDITIONS_SCRIPT introuvable ou non exécutable."
+
+    info "Délégation à install_guest_additions.sh..."
+    "$GUEST_ADDITIONS_SCRIPT" || die "install_guest_additions.sh a échoué."
+}
+
+install_vmware_tools() {
+    local -a packages=("open-vm-tools")
+    if [ "$DESKTOP" -eq 1 ]; then
+        packages+=("open-vm-tools-desktop")
+    fi
+    install_packages "${packages[@]}"
+}
+
+# -----------------------------------------------------------------------------
+# Point d'entrée
+# -----------------------------------------------------------------------------
+main() {
+    setup_logging "$@"
+
+    echo -e "\n${BOLD}=== Outils invité de virtualisation ===${RESET}\n"
+
+    local virt
+    virt="$(detect_hypervisor)"
+    info "Hyperviseur détecté : ${virt}"
+
+    case "$virt" in
+        oracle)
+            install_virtualbox_tools
+            ;;
+        vmware)
+            install_vmware_tools
+            ;;
+        none)
+            info "Machine physique : aucun outil invité à installer."
+            ;;
+        *)
+            warn "Hyperviseur « $virt » non pris en charge : rien à installer."
+            ;;
+    esac
+
+    echo -e "\n${GREEN}${BOLD}Terminé.${RESET}\n"
+}
+
+main "$@"

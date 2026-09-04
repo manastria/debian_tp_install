@@ -7,7 +7,6 @@
 ./install_network-manager.sh
 ./make_rclocal.sh
 ./install_issue.sh
-./ssh_authkey.sh
 tar -x -C / -f ndg_unhatched.tar.bz2
 chown -R sysadmin:sysadmin /home/sysadmin
 ./install_bashtop.sh
