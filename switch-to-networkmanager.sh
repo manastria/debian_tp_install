@@ -2,11 +2,13 @@
 # switch-to-networkmanager.sh
 # Objectif : forcer NetworkManager comme gestionnaire réseau (XUbuntu 25.10+)
 # Auteur   : J.-Ph. Demory
-# Usage    : sudo ./switch-to-networkmanager.sh [--force-apply]
+# Usage    : ./switch-to-networkmanager.sh [--force-apply] [--force]
 #
 # Options :
 #   --force-apply   Utilise "netplan apply" au lieu de "netplan try"
 #                   (utile si le terminal n'est pas interactif ou si try n'est pas dispo)
+#   --force         Ré-applique la configuration même si NetworkManager est déjà
+#                   actif et configuré comme renderer (script normalement idempotent)
 #
 # Prérequis :
 #   - Ubuntu/XUbuntu basé sur netplan (≥ 22.04)
@@ -27,8 +29,8 @@
 # ---------------------------------------------------------------------------
 [[ -n "${BASH_VERSION:-}" ]] || { echo "Ce script doit être exécuté avec bash." >&2; exit 1; }
 
-if [ "$EUID" -ne 0 ]; then
-    exec sudo -E bash "$(readlink -f "$0")" "$@"
+if [ "$(id -u)" -ne 0 ]; then
+    exec sudo "$(readlink -f "$0")" "$@"
 fi
 
 set -euo pipefail
@@ -47,8 +49,12 @@ die()     { error "$*"; exit 1; }
 # Arguments
 # ---------------------------------------------------------------------------
 FORCE_APPLY=0
+FORCE=0
 for arg in "$@"; do
-    [[ "$arg" == "--force-apply" ]] && FORCE_APPLY=1
+    case "$arg" in
+        --force-apply) FORCE_APPLY=1 ;;
+        --force)       FORCE=1 ;;
+    esac
 done
 
 # ---------------------------------------------------------------------------
@@ -86,6 +92,18 @@ if ! command -v NetworkManager &>/dev/null && ! dpkg -l network-manager &>/dev/n
             success "NetworkManager installé."
             ;;
     esac
+fi
+
+# Idempotence : depuis que les installeurs desktop Ubuntu/Xubuntu génèrent nativement
+# 01-network-manager-all.yaml, NM est souvent déjà le renderer actif — rien à faire.
+if [[ $FORCE -eq 0 ]] \
+    && systemctl is-active --quiet NetworkManager.service \
+    && ! systemctl is-active --quiet systemd-networkd.service \
+    && [[ -f "$NM_YAML" ]] \
+    && grep -q "renderer: NetworkManager" "$NM_YAML" 2>/dev/null; then
+    success "NetworkManager est déjà actif et configuré comme renderer netplan ($NM_YAML)."
+    info "Rien à faire. Utilisez --force pour ré-appliquer la configuration quand même."
+    exit 0
 fi
 
 # Avertir si on détecte une session SSH (la coupure réseau interromprait la connexion)
