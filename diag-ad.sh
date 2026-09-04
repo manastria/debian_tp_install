@@ -86,10 +86,24 @@ section "3. NSS (nsswitch.conf)"
 # résolu, même avec un sssd parfaitement fonctionnel.
 runsh 'grep -E "^(passwd|group|shadow|hosts|sudoers):" /etc/nsswitch.conf'
 runsh 'ls -l /usr/lib/*/libnss_sss.so* 2>&1'
+# Contenu intégral en plus du grep ciblé ci-dessus : une procédure
+# interrompue peut avoir laissé une ligne "sss" en double, mal placée, ou
+# un fichier tronqué — invisible dans un grep qui ne montre que les lignes
+# qui matchent déjà.
+printf '\n--- contenu complet de /etc/nsswitch.conf ---\n'
+runsh 'cat /etc/nsswitch.conf'
 
 section "4. PAM"
 runsh 'ls -1 /usr/share/pam-configs/'
 runsh 'grep -n "pam_sss\|mkhomedir" /etc/pam.d/common-auth /etc/pam.d/common-account /etc/pam.d/common-session /etc/pam.d/common-password'
+# Contenu intégral : l'ORDRE des modules compte autant que leur présence
+# (pam_sss doit être en "sufficient" après pam_unix, mkhomedir doit suivre
+# pam_sss dans common-session) — un grep isolé ne montre pas cet ordre, ni
+# les fichiers *-noninteractive utilisés par les connexions non graphiques.
+for f in common-auth common-account common-password common-session common-session-noninteractive; do
+    printf '\n--- /etc/pam.d/%s ---\n' "$f"
+    runsh "cat /etc/pam.d/$f 2>&1"
+done
 
 section "5. REALMD"
 run realm list
@@ -104,6 +118,12 @@ runsh 'cat /etc/krb5.conf 2>&1'
 
 section "7. CONFIGURATION SSSD"
 runsh 'ls -l /etc/sssd/ /etc/sssd/conf.d/ 2>&1'
+# SSSD refuse de démarrer SANS AUCUN message clair dans "systemctl status" si
+# sssd.conf n'est pas en 600 root:root — c'est l'oubli typique après une
+# édition manuelle interrompue (l'éditeur ou un "cp" change les permissions).
+printf '\n--- permissions attendues : 600 root:root sur sssd.conf ---\n'
+runsh 'stat -c "%n : %a %U:%G" /etc/sssd/sssd.conf 2>&1'
+runsh 'stat -c "%n : %a %U:%G" /etc/sssd/conf.d/*.conf 2>&1'
 # Masquage de tout secret éventuel avant écriture dans le rapport.
 runsh 'sed -E "s/^(.*(authtok|password).*=).*/\1 ***MASQUÉ***/I" /etc/sssd/sssd.conf 2>&1'
 runsh 'for f in /etc/sssd/conf.d/*.conf; do [ -e "$f" ] && echo "--- $f ---" && cat "$f"; done 2>&1'
@@ -172,6 +192,9 @@ check 'systemctl is-active --quiet sssd' \
 check 'test -f /etc/krb5.keytab' \
       "keytab machine présent" \
       "keytab /etc/krb5.keytab ABSENT — la jonction n'a pas abouti"
+check '[ "$(stat -c "%a" /etc/sssd/sssd.conf 2>/dev/null)" = "600" ] && [ "$(stat -c "%U" /etc/sssd/sssd.conf 2>/dev/null)" = "root" ]' \
+      "sssd.conf en 600 root:root" \
+      "sssd.conf n'est PAS en 600 root:root — sssd refuse de démarrer sans le signaler clairement (voir section 7)"
 check 'grep -qF "[domain/'"$AD_DOMAIN"']" /etc/sssd/sssd.conf' \
       "section [domain/$AD_DOMAIN] présente dans sssd.conf" \
       "section [domain/$AD_DOMAIN] ABSENTE de sssd.conf (join-ad.sh a pu écrire au mauvais endroit)"
