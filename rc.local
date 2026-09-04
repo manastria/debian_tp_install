@@ -1,64 +1,92 @@
-#!/bin/sh
-#
-# rc.local
-#
-# This script is executed at the end of each multiuser runlevel.
-# Make sure that the script will "exit 0" on success or any other
-# value on error.
-#
-# In order to enable or disable this script just change the execution
-# bits.
-#
-# By default this script does nothing.
-
 #!/bin/bash
+# =============================================================================
+# /etc/rc.local — réinitialisation au premier démarrage d'un clone
 #
-# /etc/rc.local
-# Script lancé à chaque démarrage. Si /etc/do_first_boot existe,
-# on régénère le nom d’hôte et les clés SSH, puis on supprime ce flag.
+# Déposé par make_rclocal.sh, exécuté à chaque démarrage par rc-local.service.
+# Ne fait rien tant que le drapeau /etc/do_first_boot n'existe pas : ce fichier
+# est planté juste avant l'export d'un template (par clean_system.sh, ou par
+# make_rclocal.sh --arm) et consommé ici, une seule fois.
+#
+# Quand le drapeau est présent, ce script :
+#   1. génère un nom d'hôte aléatoire (vm-XXXXXXXX) et met /etc/hosts à jour ;
+#   2. régénère les clés d'hôte SSH supprimées avant l'export ;
+#   3. supprime le drapeau, pour ne plus rien faire aux démarrages suivants.
+#
+# La trace va dans un fichier, pas sur la console : au démarrage, personne ne
+# la lit. En cas d'échec, le drapeau est conservé et une nouvelle tentative a
+# lieu au démarrage suivant.
+#
+# Pas de « set -e » ici : un démarrage ne doit pas être interrompu par une
+# commande annexe qui échoue, les erreurs sont testées une par une.
+# =============================================================================
 
-# Si vous utilisez systemd, veillez à ce que rc.local soit bien exécuté
-# (via un service systemd rc-local ou équivalent).
+readonly FLAG="/etc/do_first_boot"
+readonly LOG_DIR="/var/log/tp-install"
+readonly LOG_FILE="${LOG_DIR}/first-boot.log"
+readonly HOSTNAME_PREFIX="vm"
 
-if [ -f /etc/do_first_boot ]; then
-  echo "Premier démarrage : réinitialisation du nom d'hôte et des clés SSH."
+# Sortie immédiate au démarrage courant : c'est le cas de tous les démarrages
+# sauf le premier après un clonage.
+[ -f "$FLAG" ] || exit 0
 
-  # 1) Suppression des clés SSH actuelles
-  rm -f /etc/ssh/ssh_host_*
+mkdir -p "$LOG_DIR"
+chmod 0750 "$LOG_DIR" 2>/dev/null || true
+touch "$LOG_FILE"
+chmod 0640 "$LOG_FILE" 2>/dev/null || true
 
-  # 2) Suppression du fichier /etc/hostname
-  #    pour forcer la génération d'un nouveau nom (ou le paramétrer ci-dessous).
-  rm -f /etc/hostname
+log() { echo "$(date '+%F %T') | $*" >> "$LOG_FILE"; }
 
-  # 3) Génération d'un nouveau nom d'hôte
-  #    (vous pouvez adapter la logique, par ex. un préfixe + suffixe aléatoire)
-  newhost="vm-$(tr -dc 'a-z0-9' < /dev/urandom | head -c 10)"
+log "===== Premier démarrage : réinitialisation ====="
 
-  # Vérification que la variable est bien remplie
-  if [ -z "$newhost" ]; then
-  echo "Erreur : échec de la génération du nom d'hôte." >&2
-  exit 1
-  fi
+# --- 1. Nom d'hôte aléatoire ------------------------------------------------
+# « head -c 8 » ferme le tuyau, ce qui tue « tr » par SIGPIPE : c'est attendu,
+# et sans effet ici puisque le code de retour du pipe est celui de head.
+suffix="$(tr -dc 'a-z0-9' < /dev/urandom | head -c 8)"
+new_hostname="${HOSTNAME_PREFIX}-${suffix}"
 
-  echo "Nouveau nom d'hôte généré : $newhost"
-
-  hostnamectl set-hostname "$newhost"
-
-  # Mise à jour /etc/hosts pour pointer 127.0.1.1 vers le nouveau nom
-  sed -i '/^[[:blank:]]*127\.0\.1\.1/d' /etc/hosts
-  echo "127.0.1.1       $newhost" >> /etc/hosts
-
-  # Log
-  echo "$(date +%Y-%m-%d_%H:%M:%S) - Nouveau hostname : $newhost" >> /var/log/hostname-regenerate.log
-
-  # 4) Régénération des clés SSH
-  dpkg-reconfigure openssh-server
-  echo "$(date +%Y-%m-%d_%H:%M:%S) - Nouvelles clés SSH générées." >> /var/log/hostname-regenerate.log
-
-  # 5) Suppression du flag pour éviter que ça ne se refasse à chaque démarrage
-  rm -f /etc/do_first_boot
-
-  echo "Réinitialisation terminée."
+if [ -z "$suffix" ]; then
+    log "ERREUR : génération du suffixe aléatoire impossible. Drapeau conservé."
+    exit 1
 fi
+
+if hostnamectl set-hostname "$new_hostname"; then
+    log "Nom d'hôte : $new_hostname"
+else
+    log "ERREUR : hostnamectl a échoué. Drapeau conservé."
+    exit 1
+fi
+
+# 127.0.1.1 est la convention Debian pour le nom d'hôte local. La ligne
+# existante est supprimée avant réécriture, plutôt que remplacée à un numéro de
+# ligne fixe : /etc/hosts n'a pas toujours la même structure.
+sed -i '/^[[:blank:]]*127\.0\.1\.1/d' /etc/hosts
+echo "127.0.1.1       $new_hostname" >> /etc/hosts
+log "/etc/hosts mis à jour."
+
+# --- 2. Clés d'hôte SSH (filet de sécurité) ---------------------------------
+# En temps normal, ssh-regen-keys.service a déjà régénéré les clés bien plus
+# tôt, avant le démarrage de ssh.service ; l'appel ci-dessous ne fait alors
+# rien. Il n'est conservé que pour les VM où cette unité manquerait.
+#
+# « ssh-keygen -A » régénère uniquement les clés manquantes et ne pose aucune
+# question. C'est ce que fait « dpkg-reconfigure openssh-server » en interne,
+# mais sans risquer de bloquer sur une invite debconf au démarrage, quand
+# aucun terminal ne peut répondre.
+if [ -d /etc/ssh ] && command -v ssh-keygen > /dev/null 2>&1; then
+    if ssh-keygen -A >> "$LOG_FILE" 2>&1; then
+        log "Clés d'hôte SSH régénérées."
+        systemctl restart ssh > /dev/null 2>&1 \
+            || systemctl restart sshd > /dev/null 2>&1 \
+            || log "ATTENTION : impossible de redémarrer le service SSH."
+    else
+        log "ERREUR : ssh-keygen -A a échoué."
+    fi
+fi
+
+# --- 3. Consommation du drapeau ---------------------------------------------
+# En dernier seulement : un échec plus haut laisse une nouvelle chance au
+# démarrage suivant.
+rm -f "$FLAG"
+log "Réinitialisation terminée."
 
 exit 0

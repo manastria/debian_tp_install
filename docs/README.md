@@ -13,6 +13,8 @@ La structure imposée pour chaque page est décrite dans
 ## Pages de scripts
 
 - [`configure-sudo.sh`](configure-sudo.md) — groupes sudo de labo (`adminpwd` avec mot de passe, `admins` sans).
+- [`make_rclocal.sh`](make_rclocal.md) — relais `rc.local` de réinitialisation au premier démarrage d'un clone.
+- [`prepare-ova-export.sh`](prepare-ova-export.md) — nettoyage complet, zerofill et armement du relais avant export en `.ova`.
 
 ---
 

@@ -8,9 +8,16 @@
 #  Actions :
 #    - Nettoyage des caches APT, journaux, fichiers temporaires
 #    - Purge des historiques bash/zsh de tous les utilisateurs
-#    - Suppression des clés SSH du serveur (+ régénération au boot)
-#    - Génération d'un hostname aléatoire au premier démarrage
+#    - Armement du relais de réinitialisation au premier démarrage
+#      (hostname vm-XXXXXXXX + clés d'hôte SSH)
 #    - Remplissage de zéro (zerofill) pour optimiser la compression OVA
+#
+#  Le mécanisme de réinitialisation n'est PAS embarqué ici : ce script arme le
+#  relais partagé du dépôt (/etc/rc.local + rc-local.service +
+#  ssh-regen-keys.service), le même que celui vérifié par clean_system.sh.
+#  Si le relais manque, il tente de l'installer via make_rclocal.sh situé à
+#  côté de ce script ; à défaut, il CONSERVE les clés SSH plutôt que de rendre
+#  le clone inaccessible.
 #
 #  Usage :
 #    Méthode recommandée (aucune trace dans l'historique) :
@@ -40,6 +47,10 @@ if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
     SOURCED=true
 fi
 
+# Répertoire du dépôt, résolu depuis BASH_SOURCE et non depuis $0 : ce script
+# est prévu pour être sourcé, cas où $0 vaut le nom du shell appelant.
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+
 # ── Couleurs ──────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -63,7 +74,9 @@ while [[ $# -gt 0 ]]; do
         --no-zerofill)       ZEROFILL=false ;;
         --dry-run)           DRY_RUN=true ;;
         -h|--help)
-            sed -n '3,/^#=====/{ /^#=====/d; s/^#  \?//p }' "$0"
+            # « # \{0,2\} » et non « #  \? » : une ligne réduite à « # » est
+            # ainsi imprimée comme ligne vide, ce qui restitue les paragraphes.
+            sed -n '3,/^#=====/{ /^#=====/d; s/^# \{0,2\}//p }' "$0"
             exit 0
             ;;
         *) echo -e "${RED}Option inconnue : $1${NC}"; exit 1 ;;
@@ -87,6 +100,72 @@ run() {
         eval "$@"
         log_ok "OK"
     fi
+}
+
+# ── Relais de réinitialisation au premier démarrage ───────────────────────────
+# Mêmes tests que clean_system_rc_local_ready() dans clean_system.sh : le relais
+# est prêt si rc.local est exécutable, contient le drapeau, et que son unité est
+# activée. Garder les deux vérifications identiques est délibéré — c'est le
+# contrat du mécanisme partagé.
+first_boot_relay_ready() {
+    [[ -x /etc/rc.local ]] || return 1
+    grep -q "do_first_boot" /etc/rc.local 2>/dev/null || return 1
+    systemctl is-enabled --quiet rc-local.service 2>/dev/null || return 1
+    return 0
+}
+
+# Installe le relais s'il manque, en déléguant à make_rclocal.sh trouvé à côté
+# de ce script. Renvoie 1 si le relais reste indisponible : l'appelant décide
+# alors de ne PAS supprimer les clés SSH.
+ensure_first_boot_relay() {
+    if first_boot_relay_ready; then
+        log_ok "Relais de réinitialisation déjà en place"
+        return 0
+    fi
+
+    local installer="${SCRIPT_DIR}/make_rclocal.sh"
+    if [[ -x "$installer" ]]; then
+        log_step "Relais absent — installation via make_rclocal.sh"
+        "$installer" || true
+        if first_boot_relay_ready; then
+            log_ok "Relais installé"
+            return 0
+        fi
+    fi
+
+    log_warn "Relais de réinitialisation indisponible (make_rclocal.sh introuvable ?)"
+    return 1
+}
+
+# Les versions antérieures de ce script posaient leur propre mécanisme :
+# random-hostname.service, /usr/local/bin/set-random-hostname.sh, sentinelle
+# /etc/hostname-initialized, hostname au format labo-XXXX. Le laisser en place
+# ferait cohabiter deux générateurs de hostname au premier démarrage, dans un
+# ordre non garanti — d'où ce retrait, exécuté avant l'armement du relais.
+remove_legacy_hostname_mechanism() {
+    local found=false
+    if [[ -f /etc/systemd/system/random-hostname.service ]]; then
+        found=true
+    fi
+    if [[ -f /usr/local/bin/set-random-hostname.sh ]]; then
+        found=true
+    fi
+    if ! $found; then
+        return 0
+    fi
+
+    if $DRY_RUN; then
+        log_skip "Retrait de l'ancien mécanisme random-hostname.service"
+        return 0
+    fi
+
+    log_step "Retrait de l'ancien mécanisme random-hostname.service"
+    systemctl disable random-hostname.service &>/dev/null || true
+    rm -f /etc/systemd/system/random-hostname.service
+    rm -f /usr/local/bin/set-random-hostname.sh
+    rm -f /etc/hostname-initialized
+    systemctl daemon-reload &>/dev/null || true
+    log_ok "Ancien mécanisme retiré"
 }
 
 # ── Vérifications ─────────────────────────────────────────────────────────────
@@ -123,7 +202,7 @@ fi
 #===============================================================================
 #  1. NETTOYAGE APT
 #===============================================================================
-log_section "1/7 — Nettoyage APT"
+log_section "1/6 — Nettoyage APT"
 
 run "Suppression des paquets orphelins" \
     "apt-get -y autoremove --purge 2>/dev/null || true"
@@ -140,7 +219,7 @@ run "Suppression des fichiers .deb en cache" \
 #===============================================================================
 #  2. NETTOYAGE DES JOURNAUX ET FICHIERS TEMPORAIRES
 #===============================================================================
-log_section "2/7 — Journaux et fichiers temporaires"
+log_section "2/6 — Journaux et fichiers temporaires"
 
 run "Arrêt de rsyslog (évite la recréation de logs pendant le nettoyage)" \
     "systemctl is-active --quiet rsyslog && systemctl stop rsyslog || true"
@@ -181,7 +260,7 @@ run "Suppression des fichiers core dump" \
 #===============================================================================
 #  3. PURGE DES HISTORIQUES SHELL (tous les utilisateurs)
 #===============================================================================
-log_section "3/7 — Historiques shell"
+log_section "3/6 — Historiques shell"
 
 run "Purge des historiques bash et zsh (tous les utilisateurs)" '
     # Root
@@ -206,7 +285,7 @@ run "Purge des historiques bash et zsh (tous les utilisateurs)" '
 #===============================================================================
 #  4. NETTOYAGE RÉSEAU (machine-id, DHCP leases)
 #===============================================================================
-log_section "4/7 — Identifiants réseau"
+log_section "4/6 — Identifiants réseau"
 
 run "Troncature de /etc/machine-id (sera regénéré au boot)" \
     "truncate -s 0 /etc/machine-id && rm -f /var/lib/dbus/machine-id 2>/dev/null || true"
@@ -221,124 +300,63 @@ run "Nettoyage cloud-init (si installé)" \
     "command -v cloud-init &>/dev/null && cloud-init clean --logs --seed 2>/dev/null || true"
 
 #===============================================================================
-#  5. CLÉS SSH DU SERVEUR
+#  5. RÉINITIALISATION AU PREMIER DÉMARRAGE (relais partagé)
 #===============================================================================
-log_section "5/7 — Clés SSH du serveur"
+log_section "5/6 — Réinitialisation au premier démarrage"
 
-if $SSH_REGEN; then
-    run "Suppression des clés SSH du serveur" \
-        "rm -f /etc/ssh/ssh_host_*"
+# Ce script n'embarque plus son propre mécanisme : il arme celui que pose
+# make_rclocal.sh, et que clean_system.sh vérifie. Deux mécanismes concurrents
+# sur la même VM réécriraient le hostname deux fois au premier démarrage.
+remove_legacy_hostname_mechanism
 
-    # Service systemd pour régénérer les clés SSH au boot
-    if ! $DRY_RUN; then
-        log_step "Création du service de régénération SSH au boot"
-
-        cat > /etc/systemd/system/ssh-regen-keys.service << 'UNIT'
-[Unit]
-Description=Régénérer les clés SSH du serveur au premier démarrage
-Before=ssh.service sshd.service
-ConditionPathExists=!/etc/ssh/ssh_host_ed25519_key
-
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/ssh-keygen -A
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
-UNIT
-
-        systemctl daemon-reload
-        systemctl enable ssh-regen-keys.service
-        log_ok "Service ssh-regen-keys.service activé"
+RELAY_OK=false
+if $DRY_RUN; then
+    if first_boot_relay_ready; then
+        log_ok "Relais de réinitialisation déjà en place"
     else
-        log_skip "Création du service ssh-regen-keys.service"
+        log_skip "Installation du relais via make_rclocal.sh"
+    fi
+    # En dry-run, on montre la suite comme si le relais était disponible :
+    # l'intérêt du mode est justement d'afficher toutes les actions prévues.
+    RELAY_OK=true
+elif ensure_first_boot_relay; then
+    RELAY_OK=true
+fi
+
+# ── Clés d'hôte SSH ──────────────────────────────────────────────────────────
+# Elles ne sont supprimées que si leur régénération est garantie. Sans le
+# relais, un clone démarrerait sans clé d'hôte, donc inaccessible en SSH :
+# mieux vaut un template avec des clés partagées qu'un template injoignable.
+if $SSH_REGEN; then
+    if $RELAY_OK; then
+        run "Suppression des clés d'hôte SSH (régénérées par ssh-regen-keys.service)" \
+            "rm -f /etc/ssh/ssh_host_*"
+    else
+        log_warn "Clés d'hôte SSH CONSERVÉES : aucune régénération garantie."
+        log_warn "  -> lancez make_rclocal.sh sur cette VM, puis relancez ce script."
     fi
 else
     log_warn "Régénération SSH désactivée (--no-ssh-regen)"
 fi
 
-#===============================================================================
-#  6. HOSTNAME ALÉATOIRE AU BOOT (optionnel)
-#===============================================================================
-log_section "6/7 — Hostname aléatoire au boot"
-
+# ── Hostname aléatoire ───────────────────────────────────────────────────────
+# Le drapeau est le seul déclencheur : rc.local le consomme au démarrage
+# suivant, génère vm-XXXXXXXX, met /etc/hosts à jour, puis le supprime.
 if $RANDOM_HOSTNAME; then
-    if ! $DRY_RUN; then
-        log_step "Création du service de hostname aléatoire"
-
-        cat > /usr/local/bin/set-random-hostname.sh << 'SCRIPT'
-#!/usr/bin/env bash
-#
-# Génère un hostname aléatoire au format : labo-XXXX
-# où XXXX est un identifiant hexadécimal de 4 caractères.
-#
-# S'exécute UNE SEULE FOIS au premier boot, puis se désactive.
-#
-
-SENTINEL="/etc/hostname-initialized"
-
-# Sécurité : ne jamais écraser un hostname déjà personnalisé
-if [[ -f "$SENTINEL" ]]; then
-    logger "random-hostname: sentinelle présente, rien à faire."
-    exit 0
-fi
-
-PREFIX="labo"
-SUFFIX=$(head -c 2 /dev/urandom | od -An -tx1 | tr -d ' \n')
-NEW_HOSTNAME="${PREFIX}-${SUFFIX}"
-
-hostnamectl set-hostname "$NEW_HOSTNAME"
-echo "$NEW_HOSTNAME" > /etc/hostname
-
-# Mettre à jour /etc/hosts
-sed -i "s/127\.0\.1\.1.*/127.0.1.1\t${NEW_HOSTNAME}/" /etc/hosts
-if ! grep -q '127\.0\.1\.1' /etc/hosts; then
-    echo -e "127.0.1.1\t${NEW_HOSTNAME}" >> /etc/hosts
-fi
-
-# Créer la sentinelle et désactiver le service
-touch "$SENTINEL"
-systemctl disable random-hostname.service
-logger "Hostname défini sur : $NEW_HOSTNAME (service désactivé)"
-SCRIPT
-
-        chmod +x /usr/local/bin/set-random-hostname.sh
-
-        # Supprimer la sentinelle pour que le prochain boot la déclenche
-        rm -f /etc/hostname-initialized
-
-        cat > /etc/systemd/system/random-hostname.service << 'UNIT'
-[Unit]
-Description=Générer un hostname aléatoire au premier démarrage uniquement
-Before=network-pre.target
-Wants=network-pre.target
-After=systemd-machine-id-setup.service
-ConditionPathExists=!/etc/hostname-initialized
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/set-random-hostname.sh
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
-UNIT
-
-        systemctl daemon-reload
-        systemctl enable random-hostname.service
-        log_ok "Service random-hostname.service activé"
+    if $RELAY_OK; then
+        run "Armement de /etc/do_first_boot (hostname vm-XXXXXXXX au prochain démarrage)" \
+            "touch /etc/do_first_boot"
     else
-        log_skip "Création du service random-hostname.service"
+        log_warn "Hostname aléatoire impossible : relais indisponible."
     fi
 else
     log_warn "Hostname aléatoire désactivé (--no-random-hostname)"
 fi
 
 #===============================================================================
-#  7. ZEROFILL — Remplissage de zéros pour compression optimale
+#  6. ZEROFILL — Remplissage de zéros pour compression optimale
 #===============================================================================
-log_section "7/7 — Zerofill (optimisation compression)"
+log_section "6/6 — Zerofill (optimisation compression)"
 
 if $ZEROFILL; then
     if ! $DRY_RUN; then
