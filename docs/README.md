@@ -12,7 +12,7 @@ La structure imposée pour chaque page est décrite dans
 
 ## Pages de scripts
 
-_Aucune pour l'instant._
+- [`configure-sudo.sh`](configure-sudo.md) — groupes sudo de labo (`adminpwd` avec mot de passe, `admins` sans).
 
 ---
 
