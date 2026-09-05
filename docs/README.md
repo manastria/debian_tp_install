@@ -13,6 +13,7 @@ La structure imposée pour chaque page est décrite dans
 ## Pages de scripts
 
 - [`configure-sudo.sh`](configure-sudo.md) — groupes sudo de labo (`adminpwd` avec mot de passe, `admins` sans).
+- [`install_command-not-found.sh`](install_command-not-found.md) — installe `command-not-found` et reconstruit sa base de suggestions.
 - [`install_eth0.sh`](install_eth0.md) — noms d'interfaces classiques (`eth0`) via `net.ifnames=0` dans GRUB, sur Debian.
 - [`install_network-manager.sh`](install_network-manager.md) — bascule du réseau Debian d'ifupdown vers NetworkManager.
 - [`install_virt.sh`](install_virt.md) — outils invité selon l'hyperviseur détecté (VirtualBox, VMware).
