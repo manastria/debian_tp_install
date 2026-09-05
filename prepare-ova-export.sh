@@ -19,14 +19,10 @@
 #  côté de ce script ; à défaut, il CONSERVE les clés SSH plutôt que de rendre
 #  le clone inaccessible.
 #
-#  Usage :
-#    Méthode recommandée (aucune trace dans l'historique) :
-#      $ sudo -i
-#      # source /chemin/vers/prepare-ova-export.sh [OPTIONS]
-#      (la VM s'éteint automatiquement)
-#
-#    Méthode classique (rapide, trace minime) :
-#      $ sudo ./prepare-ova-export.sh [OPTIONS]
+#  Ce script doit être sourcé depuis un shell root, jamais exécuté :
+#    $ sudo -i
+#    # source /chemin/vers/prepare-ova-export.sh [OPTIONS]
+#    (la VM s'éteint automatiquement)
 #
 #  Options :
 #    --no-ssh-regen      Ne pas régénérer les clés SSH au redémarrage
@@ -37,19 +33,19 @@
 #
 #===============================================================================
 
+# Sauvegarde des options du shell appelant, pour les restaurer à la sortie
+# (le script est sourcé dans un shell root interactif : le laisser en
+# set -euo pipefail après coup serait surprenant pour la suite de la session).
+PREPARE_OVA_PREV_SHELLOPTS="$(set +o)"
 set -euo pipefail
 
-# ── Détection : sourcé ou exécuté ? ──────────────────────────────────────────
-# Si sourcé (source script.sh), on peut faire unset HISTFILE à la fin
-# pour ne laisser aucune trace dans l'historique du shell parent.
-SOURCED=false
-if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
-    SOURCED=true
-fi
-
-# Répertoire du dépôt, résolu depuis BASH_SOURCE et non depuis $0 : ce script
-# est prévu pour être sourcé, cas où $0 vaut le nom du shell appelant.
-SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+prepare_ova_restore_shellopts() {
+    eval "${PREPARE_OVA_PREV_SHELLOPTS}"
+}
+# RETURN se déclenche à la fin d'un script sourcé (y compris via un 'return'
+# anticipé plus bas) — jamais pour un script exécuté comme process séparé,
+# ce qui ne peut de toute façon plus arriver après le garde-fou ci-dessous.
+trap prepare_ova_restore_shellopts RETURN
 
 # ── Couleurs ──────────────────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -59,6 +55,23 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
+
+# ── Garde-fou : le script doit être sourcé, jamais exécuté ──────────────────
+# Sans ça, 'return' (utilisé plus bas pour annuler proprement sans tuer le
+# shell root appelant) échouerait hors d'une fonction ou d'un script sourcé.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    echo -e "${RED}ERREUR : Ce script ne doit pas être exécuté, mais sourcé.${NC}" >&2
+    echo -e "${RED}Raison : sourcé, il peut désactiver l'historique (unset HISTFILE) du${NC}" >&2
+    echo -e "${RED}shell root appelant en fin d'exécution — y compris la commande 'source'${NC}" >&2
+    echo -e "${RED}elle-même — pour ne laisser aucune trace avant l'extinction de la VM.${NC}" >&2
+    echo -e "${RED}Exécuté comme un process séparé, il ne pourrait pas agir sur cet historique.${NC}" >&2
+    echo -e "${RED}Utilisez la commande : source ${BASH_SOURCE[0]}${NC}" >&2
+    exit 1
+fi
+
+# Répertoire du dépôt, résolu depuis BASH_SOURCE et non depuis $0 : sourcé,
+# $0 vaut le nom du shell appelant et non le chemin de ce fichier.
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 
 # ── Options par défaut ────────────────────────────────────────────────────────
 SSH_REGEN=true
@@ -76,10 +89,11 @@ while [[ $# -gt 0 ]]; do
         -h|--help)
             # « # \{0,2\} » et non « #  \? » : une ligne réduite à « # » est
             # ainsi imprimée comme ligne vide, ce qui restitue les paragraphes.
-            sed -n '3,/^#=====/{ /^#=====/d; s/^# \{0,2\}//p }' "$0"
-            exit 0
+            # BASH_SOURCE et non $0 : sourcé, $0 vaut le nom du shell appelant.
+            sed -n '3,/^#=====/{ /^#=====/d; s/^# \{0,2\}//p }' "${BASH_SOURCE[0]}"
+            return 0
             ;;
-        *) echo -e "${RED}Option inconnue : $1${NC}"; exit 1 ;;
+        *) echo -e "${RED}Option inconnue : $1${NC}"; return 1 ;;
     esac
     shift
 done
@@ -171,14 +185,13 @@ remove_legacy_hostname_mechanism() {
 # ── Vérifications ─────────────────────────────────────────────────────────────
 if [[ $EUID -ne 0 ]]; then
     echo -e "${RED}Ce script doit être exécuté en root (sudo).${NC}"
-    # 'return' si sourcé (ne tue pas le shell), 'exit' sinon
-    $SOURCED && return 1 || exit 1
+    return 1
 fi
 
 if ! grep -qiE 'debian|ubuntu' /etc/os-release 2>/dev/null; then
     echo -e "${YELLOW}⚠ Système non Debian/Ubuntu détecté. Le script peut ne pas fonctionner correctement.${NC}"
     read -rp "Continuer quand même ? [y/N] " confirm
-    [[ "$confirm" =~ ^[yYoO]$ ]] || exit 0
+    [[ "$confirm" =~ ^[yYoO]$ ]] || return 0
 fi
 
 echo -e "${BOLD}"
@@ -196,7 +209,7 @@ if ! $DRY_RUN; then
     echo -e "${RED}${BOLD}⚠ ATTENTION : Ce script va nettoyer irréversiblement la VM.${NC}"
     echo -e "${RED}  La VM va s'éteindre à la fin du processus.${NC}"
     read -rp "  Confirmer l'exécution ? [y/N] " confirm
-    [[ "$confirm" =~ ^[yYoO]$ ]] || { echo "Annulé."; exit 0; }
+    [[ "$confirm" =~ ^[yYoO]$ ]] || { echo "Annulé."; return 0; }
 fi
 
 #===============================================================================
@@ -287,17 +300,19 @@ run "Purge des historiques bash et zsh (tous les utilisateurs)" '
 #===============================================================================
 log_section "4/6 — Identifiants réseau"
 
-run "Troncature de /etc/machine-id (sera regénéré au boot)" \
-    "truncate -s 0 /etc/machine-id && rm -f /var/lib/dbus/machine-id 2>/dev/null || true"
+run "Réinitialisation de machine-id (sera régénéré au boot)" '
+    truncate -s 0 /etc/machine-id
+    if [ -f /var/lib/dbus/machine-id ] || [ -L /var/lib/dbus/machine-id ]; then
+        rm -f /var/lib/dbus/machine-id
+        ln -s /etc/machine-id /var/lib/dbus/machine-id
+    fi
+'
 
 run "Suppression des baux DHCP" \
     "rm -f /var/lib/dhcp/*.leases /var/lib/NetworkManager/*.lease 2>/dev/null || true"
 
 run "Suppression des règles udev persistantes (interfaces réseau)" \
     "rm -f /etc/udev/rules.d/70-persistent-net.rules 2>/dev/null || true"
-
-run "Nettoyage cloud-init (si installé)" \
-    "command -v cloud-init &>/dev/null && cloud-init clean --logs --seed 2>/dev/null || true"
 
 #===============================================================================
 #  5. RÉINITIALISATION AU PREMIER DÉMARRAGE (relais partagé)
@@ -405,15 +420,12 @@ echo
 
 if ! $DRY_RUN; then
     # ── Nettoyage final de l'historique de la session courante ─────────────
-    # Si le script est sourcé, on désactive l'enregistrement de l'historique
-    # pour que RIEN ne soit écrit au logout/shutdown (y compris la commande
-    # source elle-même).
-    if $SOURCED; then
-        history -c
-        history -w
-        unset HISTFILE
-        log_ok "HISTFILE désactivé — aucune trace dans l'historique"
-    fi
+    # On désactive l'enregistrement de l'historique pour que RIEN ne soit
+    # écrit au logout/shutdown, y compris la commande source elle-même.
+    history -c
+    history -w
+    unset HISTFILE
+    log_ok "HISTFILE désactivé — aucune trace dans l'historique"
 
     echo -e "${YELLOW}La VM va s'éteindre dans 10 secondes...${NC}"
     echo -e "${YELLOW}Ctrl+C pour annuler l'arrêt.${NC}"
