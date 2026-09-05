@@ -86,15 +86,7 @@ EOF
 
 # APTCOMMANDNOTFOUND
 printf "\n"
-echo -e "\033[32;1mConfiguration de command-not-found\033[0m"
-apt update
-if [ -x /usr/sbin/update-command-not-found ]; then
-    /usr/sbin/update-command-not-found
-else
-    echo "INFO: update-command-not-found non disponible, ignoré."
-fi
-printf "\n"
-# read -p "Press key to continue.. " -n1 -s
+"${real_script_dir}/install_command-not-found.sh"
 
 # APTAPTFILE
 printf "\n"
