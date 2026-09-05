@@ -9,13 +9,13 @@
 # --- DEUX MODES DE NETTOYAGE ---
 #
 # Mode LÉGER (par défaut) : uniquement ce qui est nécessaire à l'unicité des
-# clones (clés d'hôte SSH, machine-id, cloud-init si disponible/installable,
-# réinitialisation au prochain démarrage) et l'effacement de l'historique.
+# clones (clés d'hôte SSH, machine-id, réinitialisation au prochain démarrage)
+# et l'effacement de l'historique.
 # Ne touche ni au cache APT, ni aux logs, ni aux fichiers temporaires.
 # Sécurité : les clés SSH ne sont supprimées que si un mécanisme de
-# régénération au démarrage est confirmé disponible (cloud-init installé,
-# ou make_rclocal.sh déjà exécuté) — sinon la VM deviendrait inaccessible
-# en SSH au prochain démarrage.
+# régénération au démarrage est confirmé disponible (make_rclocal.sh déjà
+# exécuté) — sinon la VM deviendrait inaccessible en SSH au prochain
+# démarrage.
 #
 # Mode COMPLET (optionnel) : ajoute en plus le nettoyage du cache APT, des
 # logs système (rsyslog/journald) et des répertoires temporaires. À activer
@@ -244,35 +244,7 @@ if [ -f /var/lib/dbus/machine-id ]; then
     ln -s /etc/machine-id /var/lib/dbus/machine-id
 fi
 
-# --- 2. cloud-init pour la généralisation (approche moderne) ---
-# cloud-init sait régénérer proprement clés SSH/hostname/réseau au premier
-# démarrage. On l'installe s'il est absent, en mode best-effort : l'absence
-# de réseau ne doit pas faire échouer le reste du script.
-CLEAN_SYSTEM_CLOUD_INIT_OK=0
-if ! command -v cloud-init &> /dev/null; then
-    clean_system_info "[+] cloud-init absent, tentative d'installation..."
-    if apt-get update -qq > /dev/null 2>&1 && apt-get install -y cloud-init > /dev/null 2>&1; then
-        clean_system_success "cloud-init installé."
-    else
-        clean_system_warn "Installation de cloud-init impossible (pas de réseau ?), étape ignorée."
-    fi
-fi
-
-if command -v cloud-init &> /dev/null; then
-    CLEAN_SYSTEM_CLOUD_INIT_OK=1
-    # Sur une VM sans service de métadonnées cloud (VirtualBox), forcer le
-    # datasource "None" : sans cela, cloud-init sonde AWS/Azure/GCE/... au
-    # démarrage, ce qui ralentit le boot, voire se désactive faute de réponse.
-    if [ ! -f /etc/cloud/cloud.cfg.d/99-datasource-none.cfg ]; then
-        cat > /etc/cloud/cloud.cfg.d/99-datasource-none.cfg <<'EOF'
-datasource_list: [ None ]
-EOF
-    fi
-    clean_system_info "[+] Nettoyage de cloud-init..."
-    cloud-init clean --logs --seed
-fi
-
-# --- 3. Réinitialisation au prochain démarrage via /etc/rc.local ---
+# --- 2. Réinitialisation au prochain démarrage via /etc/rc.local ---
 # La présence de /etc/do_first_boot déclenche la réinitialisation du nom
 # d'hôte et des clés SSH au prochain démarrage, via /etc/rc.local. On vérifie
 # que make_rclocal.sh a bien été exécuté avant de s'y fier : sinon le flag
@@ -287,20 +259,20 @@ else
     clean_system_warn "    /etc/do_first_boot n'est pas créé : le hostname ne sera pas réinitialisé par ce relais."
 fi
 
-# --- 4. Suppression des clés d'hôte SSH (sécurité) ---
+# --- 3. Suppression des clés d'hôte SSH (sécurité) ---
 # On ne supprime les clés que si un mécanisme de régénération au démarrage
-# est confirmé (cloud-init ou rc.local + do_first_boot) : sinon la VM se
-# retrouverait sans clé SSH, donc inaccessible en SSH au prochain démarrage.
-if [[ "${CLEAN_SYSTEM_CLOUD_INIT_OK}" -eq 1 || "${CLEAN_SYSTEM_RC_LOCAL_OK}" -eq 1 ]]; then
+# est confirmé (rc.local + do_first_boot) : sinon la VM se retrouverait
+# sans clé SSH, donc inaccessible en SSH au prochain démarrage.
+if [[ "${CLEAN_SYSTEM_RC_LOCAL_OK}" -eq 1 ]]; then
     clean_system_info "[+] Suppression des clés d'hôte SSH..."
     rm -f /etc/ssh/ssh_host_*_key*
 else
-    clean_system_warn "[!] Aucun mécanisme de régénération SSH confirmé (ni cloud-init, ni rc.local)."
+    clean_system_warn "[!] Aucun mécanisme de régénération SSH confirmé (rc.local)."
     clean_system_warn "    Clés d'hôte SSH CONSERVÉES pour ne pas rendre la VM inaccessible en SSH."
-    clean_system_warn "    -> Lancez make_rclocal.sh (ou assurez un accès réseau pour cloud-init), puis relancez ce script."
+    clean_system_warn "    -> Lancez make_rclocal.sh, puis relancez ce script."
 fi
 
-# --- 5. Nettoyage de l'historique Shell (LA solution à votre problème) ---
+# --- 4. Nettoyage de l'historique Shell (LA solution à votre problème) ---
 clean_system_info "[+] Effacement de l'historique shell..."
 
 # Efface l'historique de la session courante en mémoire
@@ -315,7 +287,7 @@ find /root /home -type f -name ".*_history" -delete
 # ne sera écrit.
 unset HISTFILE
 
-# --- 6. Nettoyage complet (optionnel, CLEAN_SYSTEM_FULL_CLEAN=1) ---
+# --- 5. Nettoyage complet (optionnel, CLEAN_SYSTEM_FULL_CLEAN=1) ---
 if [[ "${CLEAN_SYSTEM_FULL_CLEAN}" == "1" ]]; then
 
     # Nettoyage du gestionnaire de paquets APT
