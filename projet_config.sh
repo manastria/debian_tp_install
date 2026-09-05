@@ -1,5 +1,7 @@
 #!/bin/bash
 
+## TODO : moderniser ce script
+
 _DEBUG="off"
 
 DEBUG()
@@ -38,7 +40,7 @@ declare -r COL_GREEN=$ESC_SEQ"32;01m"
 declare -r COL_YELLOW=$ESC_SEQ"33;01m"
 declare -r COL_BLUE=$ESC_SEQ"34;01m"
 declare -r COL_MAGENTA=$ESC_SEQ"35;01m"
-declare -r COL_CYAN=$ESC_SEQ"36;01m" 
+declare -r COL_CYAN=$ESC_SEQ"36;01m"
 
 # Retourne 0 si egale, 1 si sup, 2 si inf
 vercomp () {
@@ -81,7 +83,7 @@ INSTALLDIR=${1:-$HOME}
 GIT_VERSION=$(git --version | awk '{print $3}')
 
 #if [[ $(git rev-parse --is-inside-work-tree) == true ]]; then
-	
+
 
 inside_git_repo="$(git rev-parse --is-inside-work-tree 2>/dev/null)"
 if [ "$inside_git_repo" ]; then
@@ -102,7 +104,7 @@ res=$?
 if [ $res -eq 2 ]
 then
 	GIT_VER_260=true
-	DEBUG echo "GIT_VER_260" 
+	DEBUG echo "GIT_VER_260"
 fi
 
 vercomp 1.8.0 ${GIT_VERSION}
@@ -258,8 +260,8 @@ if [ "$config_mergetool" == "Y" ] || [ "$config_mergetool" == "y" ]; then
 	echo "    - Meld/Meld.exe"
 	echo "    - KDiff3/kdiff3.exe"
 	echo "    - Perforce/p4merge.exe"
-	
-	
+
+
 	read -re path_mt
 	path_mt=$(echo "/$path_mt" | sed -e 's/\\/\//g' -e 's/://')
 

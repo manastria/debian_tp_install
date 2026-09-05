@@ -73,32 +73,6 @@ vmware_gui=(
     open-vm-tools-desktop
 )
 
-lxc=(
-    lxc
-    bridge-utils
-    vlan
-    libvirt-daemon-system
-    libvirt-dev
-    libvirt-clients
-    debootstrap
-    vde2
-    openvswitch-switch
-    xfce4
-    galculator
-    open-vm-tools-desktop
-    terminator
-    wireshark
-    traceroute
-    nmap
-    zenmap
-    netcat
-    ipcalc
-    gip
-    etckeeper
-    glances
-    net-tools
-)
-
 other=(
     iputils-ping
     apt-file
