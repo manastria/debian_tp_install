@@ -45,6 +45,13 @@ Deux voisins à ne pas confondre :
 | `make_rclocal.sh` et `rc.local` | Dans le même répertoire, pour installer le relais s'il manque | `ls make_rclocal.sh rc.local` |
 | Espace disque libre | Le zerofill remplit tout l'espace disponible avant de le libérer | `df -h /` |
 
+**Emplacement du dépôt sur la VM** : à cloner dans `/opt/debian_tp_install`, jamais dans `/tmp`. L'étape 2/6 vide `/tmp` et `/var/tmp` ; un dépôt cloné là y compris `make_rclocal.sh`, utilisé par l'étape 5/6, disparaît avant d'avoir servi. `/opt` n'appartient à aucun utilisateur, n'est touché par aucune étape du nettoyage, et évite de laisser ces scripts de maintenance dans un répertoire où un étudiant travaillerait.
+
+```bash
+sudo git clone -b debian_12 --single-branch --depth 1 \
+    https://github.com/manastria/debian_tp_install.git /opt/debian_tp_install
+```
+
 ### Syntaxe
 
 ```
@@ -204,3 +211,4 @@ run "Suppression des dépôts de test" \
 - `run()` évalue ses arguments avec `eval`. Toute nouvelle étape doit donc être écrite en tenant compte de la double expansion : préférer les guillemets simples autour du corps de la commande, comme le font les étapes existantes multi-lignes.
 - La suppression des règles udev `70-persistent-net.rules` fait double emploi avec `install_eth0.sh`, qui désactive le nommage prédictible par GRUB. Les deux peuvent coexister sans conflit, mais sur une VM passée par `install_eth0.sh` cette ligne n'a plus d'objet.
 - Le script n'écrit pas de trace dans `/var/log/tp-install/` contrairement aux autres scripts du dépôt : ce serait contre-productif, puisque l'étape 2 vient précisément de vider ce répertoire. C'est l'exception assumée à la règle de `CLAUDE.md`.
+- **Cloner le dépôt dans `/tmp` casse l'étape 5/6 sans que rien ne le signale bruyamment** : bash garde le script ouvert le temps de le sourcer, donc l'exécution se termine normalement malgré la suppression de `/tmp` par l'étape 2 — mais `${SCRIPT_DIR}/make_rclocal.sh`, résolu en tête de script, pointe alors vers un fichier déjà supprimé. `ensure_first_boot_relay` échoue silencieusement (juste un `⚠` dans la sortie), les clés SSH sont conservées et le hostname n'est pas réarmé, sans qu'aucune erreur fatale n'arrête le script. Voir Prérequis pour l'emplacement recommandé (`/opt`).
