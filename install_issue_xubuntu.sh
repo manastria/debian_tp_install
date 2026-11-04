@@ -1,31 +1,35 @@
 #!/usr/bin/env bash
 # install_issue_xubuntu.sh
-# Objectif : afficher le hostname et les adresses IP sans ouvrir de session
-#              - consoles texte (Ctrl+Alt+F1 à F6) : via /etc/issue
-#              - écran de connexion LightDM : hostname dans la barre du haut
-#                (indicateur ~host) et hostname + IP sur l'image de fond
+# Objectif : afficher les adresses IP sur les consoles texte (Ctrl+Alt+F1 à F6)
+#            sans ouvrir de session, via /etc/issue
 # Auteur   : Manastria
 # Usage    : sudo ./install_issue_xubuntu.sh [--uninstall]
 #
 # Fonctionnement :
 #   Un script dispatcher NetworkManager (/etc/NetworkManager/dispatcher.d/90-login-info)
-#   s'exécute à chaque changement réseau (up, down, dhcp4-change, hostname).
-#   Il régénère /etc/issue à partir de /etc/issue.std, puis l'image de fond
-#   du greeter. Remplace install_issue.sh (ifupdown, Debian) sur Xubuntu.
+#   s'exécute à chaque changement réseau (up, down, dhcp4-change).
+#   Il régénère /etc/issue à partir de /etc/issue.std (copie de l'original) en
+#   y ajoutant un tableau coloré : interface, type, adresse IP/masque.
+#   Ordre : Ethernet en premier (vert), puis Wi-Fi, autres, puis Docker/libvirt
+#   (gris, moins mis en avant mais visibles).
+#   Le hostname est déjà affiché par l'escape \n de /etc/issue.
+#   Remplace install_issue.sh (ifupdown, Debian) sur Xubuntu.
 #
 # Prérequis :
-#   - Xubuntu 24.04+ (LightDM + lightdm-gtk-greeter) géré par NetworkManager
+#   - Xubuntu 24.04+ géré par NetworkManager
 #   - Exécution en root (le script se relance via sudo)
-#   - Accès aux dépôts apt (paquets imagemagick et fonts-dejavu-core)
 #
 # Remarques :
-#   - L'image de fond est relue à chaque affichage du greeter (déconnexion,
-#     verrouillage, redémarrage). LightDM n'est PAS redémarré par le script :
-#     cela fermerait les sessions ouvertes.
-#   - Pour rafraîchir une console texte : systemctl restart getty@tty1
-#     (ferme la session ouverte sur tty1).
-#   - Les réglages de l'image (taille, couleurs, interfaces ignorées) se
-#     modifient en tête du fichier dispatcher généré.
+#   - "Raccourci" sur la console : appuyer sur Entrée à l'invite "login:" sans
+#     rien taper. agetty efface alors l'écran (le fichier commence par une
+#     séquence d'effacement) et relit /etc/issue, donc affiche les adresses à jour.
+#   - Les interfaces ignorées et les couleurs se modifient en tête du fichier
+#     dispatcher généré (EXCLUDE_IFACES, C_*).
+#   - Le tableau utilise des caractères de tracé Unicode (┌─┬┐) : la console
+#     texte d'Ubuntu (UTF-8) les affiche correctement.
+#   - Ne pas utiliser en même temps que install_issue.sh (même /etc/issue.std).
+#   - Les versions précédentes de ce script configuraient aussi l'écran LightDM :
+#     ce reliquat est nettoyé automatiquement (installation ou désinstallation).
 #
 # Restauration : sudo ./install_issue_xubuntu.sh --uninstall
 
@@ -62,20 +66,30 @@ for arg in "$@"; do
 done
 
 # ---------------------------------------------------------------------------
-# Variables globales (à garder cohérentes avec l'en-tête du dispatcher généré)
+# Variables globales
 # ---------------------------------------------------------------------------
 HOOK="/etc/NetworkManager/dispatcher.d/90-login-info"
 ISSUE="/etc/issue"
 ISSUE_STD="/etc/issue.std"
+
+# Reliquats des anciennes versions (affichage LightDM)
 BG_FILE="/usr/share/backgrounds/login-info.png"
-FONT="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 GREETER_MAIN="/etc/lightdm/lightdm-gtk-greeter.conf"
 GREETER_DROPIN="/etc/lightdm/lightdm-gtk-greeter.conf.d/50-login-info.conf"
 GREETER_BAK="${GREETER_MAIN}.bak-login-info"
 
+# Supprime les fichiers LightDM créés par les anciennes versions du script
+cleanup_legacy_greeter() {
+    rm -f "$GREETER_DROPIN" "$BG_FILE" /usr/share/backgrounds/login-info.*.png
+    if [[ -f "$GREETER_BAK" ]]; then
+        mv -f "$GREETER_BAK" "$GREETER_MAIN"
+        success "$GREETER_MAIN restauré (reliquat d'une ancienne version)."
+    fi
+}
+
 echo ""
 echo -e "${BLUE}══════════════════════════════════════════════════════${NC}"
-echo -e "${BLUE}  Hostname et IP à l'écran de connexion — $(lsb_release -ds 2>/dev/null || echo "Ubuntu")${NC}"
+echo -e "${BLUE}  Adresses IP sur la console (/etc/issue) — $(lsb_release -ds 2>/dev/null || echo "Ubuntu")${NC}"
 echo -e "${BLUE}══════════════════════════════════════════════════════${NC}"
 echo ""
 
@@ -84,14 +98,11 @@ echo ""
 # ---------------------------------------------------------------------------
 if [[ "$UNINSTALL" -eq 1 ]]; then
     info "Désinstallation..."
-    rm -f "$HOOK" "$GREETER_DROPIN" "$BG_FILE"
+    rm -f "$HOOK"
+    cleanup_legacy_greeter
     if [[ -f "$ISSUE_STD" ]]; then
         mv -f "$ISSUE_STD" "$ISSUE"
         success "/etc/issue restauré."
-    fi
-    if [[ -f "$GREETER_BAK" ]]; then
-        mv -f "$GREETER_BAK" "$GREETER_MAIN"
-        success "$GREETER_MAIN restauré."
     fi
     success "Désinstallation terminée."
     exit 0
@@ -100,42 +111,21 @@ fi
 # ---------------------------------------------------------------------------
 # ÉTAPE 1 — Pré-vérifications
 # ---------------------------------------------------------------------------
-info "[1/5] Pré-vérifications..."
+info "[1/3] Pré-vérifications..."
 
 command -v nmcli &>/dev/null || die "NetworkManager introuvable. Ce script cible Xubuntu géré par NetworkManager."
 systemctl is-active --quiet NetworkManager || warning "NetworkManager n'est pas actif : le dispatcher ne sera appelé qu'après son démarrage."
 
-HAS_LIGHTDM=0
-if [[ -d /etc/lightdm ]]; then
-    HAS_LIGHTDM=1
-    success "LightDM détecté : console texte et écran de connexion graphique."
-else
-    warning "LightDM absent : seule la console texte (/etc/issue) sera configurée."
+if [[ -f "$GREETER_DROPIN" || -f "$BG_FILE" || -f "$GREETER_BAK" ]]; then
+    info "Nettoyage de la configuration LightDM d'une ancienne version..."
+    cleanup_legacy_greeter
 fi
+success "Pré-vérifications OK."
 
 # ---------------------------------------------------------------------------
-# ÉTAPE 2 — Paquets
+# ÉTAPE 2 — Dispatcher NetworkManager
 # ---------------------------------------------------------------------------
-info "[2/5] Paquets nécessaires..."
-
-if [[ "$HAS_LIGHTDM" -eq 1 ]]; then
-    need=()
-    command -v magick &>/dev/null || command -v convert &>/dev/null || need+=(imagemagick)
-    [[ -f "$FONT" ]] || need+=(fonts-dejavu-core)
-    if (( ${#need[@]} )); then
-        info "Installation de : ${need[*]}"
-        apt-get update -q
-        apt-get install -y --no-install-recommends "${need[@]}"
-    fi
-    success "ImageMagick et police DejaVu disponibles."
-else
-    info "Rien à installer (pas de LightDM)."
-fi
-
-# ---------------------------------------------------------------------------
-# ÉTAPE 3 — Dispatcher NetworkManager
-# ---------------------------------------------------------------------------
-info "[3/5] Installation du dispatcher NetworkManager..."
+info "[2/3] Installation du dispatcher NetworkManager..."
 
 if [[ ! -e "$ISSUE_STD" ]]; then
     cp -a "$ISSUE" "$ISSUE_STD"
@@ -149,27 +139,35 @@ cat > "$HOOK" <<'HOOK_EOF'
 # /etc/NetworkManager/dispatcher.d/90-login-info
 # Généré par install_issue_xubuntu.sh
 #
-# Met à jour le hostname et les adresses IP affichés sans ouvrir de session :
-#   - consoles texte : /etc/issue (reconstruit depuis /etc/issue.std)
-#   - écran de connexion LightDM : image de fond
+# Met à jour les adresses IP affichées sur les consoles texte (/etc/issue,
+# reconstruit depuis /etc/issue.std) sans ouvrir de session.
 
 ISSUE="/etc/issue"
 ISSUE_STD="/etc/issue.std"
-BG_FILE="/usr/share/backgrounds/login-info.png"
-BG_SIZE="1920x1080"
-BG_COLOR="#1e1e2e"
-HOST_COLOR="#cdd6f4"
-IP_COLOR="#a6adc8"
-FONT="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-EXCLUDE_IFACES='^(lo|docker|veth|virbr|br-|tun|tap)'
+# Interfaces ignorées (expression régulière, début de nom)
+EXCLUDE_IFACES='^(lo|veth|tun|tap)'
+
+# Couleurs (séquences ANSI interprétées par la console texte)
+ESC=$'\033'
+C_RST="${ESC}[0m"
+C_BORDER="${ESC}[90m"   # gris
+C_HEAD="${ESC}[1;36m"   # cyan gras
+C_ETH="${ESC}[1;32m"    # vert gras  : Ethernet
+C_WIFI="${ESC}[1;36m"   # cyan gras  : Wi-Fi
+C_OTHER="${ESC}[0;37m"  # blanc      : autres
+C_VIRT="${ESC}[90m"     # gris       : Docker, libvirt
+C_ERR="${ESC}[1;31m"    # rouge gras : aucune adresse
+CLEAR="${ESC}[H${ESC}[2J"   # efface l'écran à chaque affichage de /etc/issue
 
 iface="${1:-}"
 action="${2:-}"
 
 case "$action" in
-    up|down|dhcp4-change|hostname) ;;
+    up|down|dhcp4-change) ;;
     *) exit 0 ;;
 esac
+
+[[ -f "$ISSUE_STD" ]] || exit 0
 
 # Évite deux régénérations simultanées
 exec 9>/run/login-info.lock
@@ -179,32 +177,60 @@ flock 9
 skip=""
 [[ "$action" == "down" ]] && skip="$iface"
 
-host="$(hostname)"
-addrs="$(ip -o -4 addr show scope global \
-    | awk -v re="$EXCLUDE_IFACES" -v skip="$skip" \
-        '$2 !~ re && $2 != skip { split($4, a, "/"); printf "%s - %s\n", $2, a[1] }')"
-[[ -n "$addrs" ]] || addrs="(aucune adresse)"
+# Lignes "rang|interface|type|adresse/masque", triées : Ethernet d'abord
+rows="$(ip -o -4 addr show scope global \
+    | awk -v re="$EXCLUDE_IFACES" -v skip="$skip" '
+        $2 !~ re && $2 != skip {
+            n = $2
+            if      (n ~ /^(docker|br-)/) { t = "Docker";   r = 4 }
+            else if (n ~ /^virbr/)        { t = "libvirt";  r = 5 }
+            else if (n ~ /^(en|eth)/)     { t = "Ethernet"; r = 1 }
+            else if (n ~ /^wl/)           { t = "Wi-Fi";    r = 2 }
+            else                          { t = "Autre";    r = 3 }
+            printf "%d|%s|%s|%s\n", r, n, t, $4
+        }' \
+    | sort -t'|' -k1,1n -k2,2)"
 
-# --- Console texte ---------------------------------------------------------
-if [[ -f "$ISSUE_STD" ]]; then
-    { cat "$ISSUE_STD"; echo "$addrs"; echo; } > "$ISSUE.tmp" && mv -f "$ISSUE.tmp" "$ISSUE"
-fi
+# Largeurs de colonnes (minimum = largeur de l'en-tête)
+w1=9; w2=4; w3=10
+while IFS='|' read -r _ n t a; do
+    [[ -n "$n" ]] || continue
+    (( ${#n} > w1 )) && w1=${#n}
+    (( ${#t} > w2 )) && w2=${#t}
+    (( ${#a} > w3 )) && w3=${#a}
+done <<< "$rows"
 
-# --- Écran de connexion LightDM --------------------------------------------
-[[ -d /etc/lightdm ]] || exit 0
-im="$(command -v magick || command -v convert || true)"
-[[ -n "$im" && -f "$FONT" ]] || exit 0
+bar() { local s="" i; for ((i = 0; i < $1 + 2; i++)); do s+="─"; done; printf '%s' "$s"; }
+hr()  { printf '%s%s%s%s%s%s%s%s%s\n' "$C_BORDER" "$1" "$(bar "$w1")" "$2" "$(bar "$w2")" "$2" "$(bar "$w3")" "$3" "$C_RST"; }
+trow() {   # couleur interface type adresse
+    local c="$1" b="${C_BORDER}│${C_RST}"
+    printf '%s %s%-*s%s %s %s%-*s%s %s %s%-*s%s %s\n' \
+        "$b" "$c" "$w1" "$2" "$C_RST" "$b" "$c" "$w2" "$3" "$C_RST" "$b" "$c" "$w3" "$4" "$C_RST" "$b"
+}
 
-tmp="$(mktemp --suffix=.png "${BG_FILE%.png}.XXXXXX")"
-if "$im" -size "$BG_SIZE" "xc:$BG_COLOR" -gravity center -font "$FONT" \
-        -fill "$HOST_COLOR" -pointsize 96 -annotate +0-200 "$host" \
-        -fill "$IP_COLOR" -pointsize 54 -interline-spacing 12 -annotate +0+60 "$addrs" \
-        "$tmp"; then
-    chmod 644 "$tmp"
-    mv -f "$tmp" "$BG_FILE"
-else
-    rm -f "$tmp"
-fi
+{
+    printf '%s' "$CLEAR"
+    cat "$ISSUE_STD"
+    if [[ -n "$rows" ]]; then
+        hr "┌" "┬" "┐"
+        trow "$C_HEAD" "Interface" "Type" "Adresse IP"
+        hr "├" "┼" "┤"
+        while IFS='|' read -r r n t a; do
+            [[ -n "$n" ]] || continue
+            case "$r" in
+                1) c="$C_ETH" ;;
+                2) c="$C_WIFI" ;;
+                3) c="$C_OTHER" ;;
+                *) c="$C_VIRT" ;;
+            esac
+            trow "$c" "$n" "$t" "$a"
+        done <<< "$rows"
+        hr "└" "┴" "┘"
+    else
+        printf '%s(aucune adresse)%s\n' "$C_ERR" "$C_RST"
+    fi
+    printf '%sEntrée à l'"'"'invite login : efface l'"'"'écran et rafraîchit cet affichage%s\n\n' "$C_BORDER" "$C_RST"
+} > "$ISSUE.tmp" && mv -f "$ISSUE.tmp" "$ISSUE"
 exit 0
 HOOK_EOF
 
@@ -213,62 +239,15 @@ chmod 755 "$HOOK"
 success "$HOOK installé."
 
 # ---------------------------------------------------------------------------
-# ÉTAPE 4 — Greeter LightDM
+# ÉTAPE 3 — Première génération
 # ---------------------------------------------------------------------------
-info "[4/5] Configuration du greeter LightDM..."
-
-if [[ "$HAS_LIGHTDM" -eq 1 ]]; then
-    mkdir -p "$(dirname "$GREETER_DROPIN")"
-    cat > "$GREETER_DROPIN" <<EOF
-[greeter]
-background=$BG_FILE
-user-background=false
-indicators=~host;~spacer;~clock;~spacer;~language;~session;~a11y;~power
-EOF
-    chmod 644 "$GREETER_DROPIN"
-    success "$GREETER_DROPIN écrit (indicateur ~host + image de fond)."
-
-    # Le fichier principal est lu en dernier : il écraserait le fichier ci-dessus
-    if [[ -f "$GREETER_MAIN" ]] && grep -qE '^[[:space:]]*(background|user-background|indicators)[[:space:]]*=' "$GREETER_MAIN"; then
-        [[ -e "$GREETER_BAK" ]] || cp -a "$GREETER_MAIN" "$GREETER_BAK"
-        sed -i -E 's/^([[:space:]]*)(background|user-background|indicators)([[:space:]]*=)/\1#\2\3/' "$GREETER_MAIN"
-        warning "Réglages background/user-background/indicators commentés dans $GREETER_MAIN (sauvegarde : $GREETER_BAK)."
-    fi
-
-    # Contrôle : d'autres fichiers de config du greeter définissent-ils les mêmes clés ?
-    # (information seulement : ces fichiers ne sont pas modifiés)
-    conflicts=()
-    for f in /etc/lightdm/lightdm-gtk-greeter.conf.d/*.conf \
-             /usr/share/lightdm/lightdm-gtk-greeter.conf.d/*.conf \
-             /etc/xdg/lightdm/lightdm-gtk-greeter.conf; do
-        [[ -f "$f" && "$f" != "$GREETER_DROPIN" ]] || continue
-        if grep -qE '^[[:space:]]*(background|user-background|indicators)[[:space:]]*=' "$f"; then
-            conflicts+=("$f")
-        fi
-    done
-    if (( ${#conflicts[@]} )); then
-        warning "D'autres fichiers définissent background/user-background/indicators :"
-        printf '          - %s\n' "${conflicts[@]}"
-        warning "Selon l'ordre de lecture du greeter, ils peuvent prendre le pas sur $GREETER_DROPIN."
-        warning "Si l'image n'apparaît pas, commentez ces clés ou renommez le drop-in pour qu'il soit lu en dernier."
-    else
-        success "Aucun autre fichier de config du greeter ne redéfinit ces clés."
-    fi
-else
-    info "Ignoré (pas de LightDM)."
-fi
-
-# ---------------------------------------------------------------------------
-# ÉTAPE 5 — Première génération
-# ---------------------------------------------------------------------------
-info "[5/5] Génération initiale..."
+info "[3/3] Génération initiale..."
 
 "$HOOK" "" up || warning "Le dispatcher a retourné une erreur."
-success "Terminé. Contenu actuel de $ISSUE :"
-sed 's/^/    /' "$ISSUE"
-[[ -f "$BG_FILE" ]] && success "Image de fond : $BG_FILE"
+success "Terminé. Aperçu de $ISSUE (séquence d'effacement omise) :"
+# \n et \l sont interprétés par agetty : on les remplace pour l'aperçu
+sed -e 's/\x1b\[H\x1b\[2J//' -e "s/\\\\n/$(hostname)/" -e 's/\\l/tty1/' -e 's/^/    /' "$ISSUE"
 
 echo ""
-info "Console texte : systemctl restart getty@tty1 (ferme la session de tty1)"
-info "Écran graphique : visible à la prochaine déconnexion ou au prochain démarrage"
+info "Console texte (Ctrl+Alt+F1..F6) : Entrée à l'invite login efface et rafraîchit."
 info "Test manuel : sudo $HOOK eth0 up"
