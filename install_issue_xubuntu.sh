@@ -20,9 +20,13 @@
 #   - Exécution en root (le script se relance via sudo)
 #
 # Remarques :
-#   - "Raccourci" sur la console : appuyer sur Entrée à l'invite "login:" sans
-#     rien taper. agetty efface alors l'écran (le fichier commence par une
-#     séquence d'effacement) et relit /etc/issue, donc affiche les adresses à jour.
+#   - Rafraîchissement automatique : après chaque régénération, le dispatcher
+#     exécute "agetty --reload". Les consoles qui affichent l'invite "login:"
+#     (sans saisie commencée) effacent l'écran et réaffichent /etc/issue à jour.
+#   - "Raccourci" manuel sur la console : Ctrl+D à l'invite "login:" termine
+#     agetty ; systemd le relance aussitôt (écran effacé, /etc/issue relu).
+#     Ctrl+U efface la saisie en cours.
+#     (Entrée seul ne fait que réafficher l'invite : agetty ne relit pas le fichier.)
 #   - Les interfaces ignorées et les couleurs se modifient en tête du fichier
 #     dispatcher généré (EXCLUDE_IFACES, C_*).
 #   - Le tableau utilise des caractères de tracé Unicode (┌─┬┐) : la console
@@ -157,7 +161,6 @@ C_WIFI="${ESC}[1;36m"   # cyan gras  : Wi-Fi
 C_OTHER="${ESC}[0;37m"  # blanc      : autres
 C_VIRT="${ESC}[90m"     # gris       : Docker, libvirt
 C_ERR="${ESC}[1;31m"    # rouge gras : aucune adresse
-CLEAR="${ESC}[H${ESC}[2J"   # efface l'écran à chaque affichage de /etc/issue
 
 iface="${1:-}"
 action="${2:-}"
@@ -209,7 +212,6 @@ trow() {   # couleur interface type adresse
 }
 
 {
-    printf '%s' "$CLEAR"
     cat "$ISSUE_STD"
     if [[ -n "$rows" ]]; then
         hr "┌" "┬" "┐"
@@ -229,8 +231,14 @@ trow() {   # couleur interface type adresse
     else
         printf '%s(aucune adresse)%s\n' "$C_ERR" "$C_RST"
     fi
-    printf '%sEntrée à l'"'"'invite login : efface l'"'"'écran et rafraîchit cet affichage%s\n\n' "$C_BORDER" "$C_RST"
+    printf '%sCtrl+D à l'"'"'invite login : efface l'"'"'écran et réaffiche%s\n\n' "$C_BORDER" "$C_RST"
 } > "$ISSUE.tmp" && mv -f "$ISSUE.tmp" "$ISSUE"
+
+# Demande aux consoles en attente de login de relire /etc/issue (écran effacé
+# et réaffiché seulement si le contenu a changé et si aucune saisie n'est commencée)
+agetty_bin="$(command -v agetty || true)"
+[[ -n "$agetty_bin" ]] || agetty_bin="/sbin/agetty"
+"$agetty_bin" --reload >/dev/null 2>&1 || true
 exit 0
 HOOK_EOF
 
@@ -244,10 +252,11 @@ success "$HOOK installé."
 info "[3/3] Génération initiale..."
 
 "$HOOK" "" up || warning "Le dispatcher a retourné une erreur."
-success "Terminé. Aperçu de $ISSUE (séquence d'effacement omise) :"
+success "Terminé. Aperçu de $ISSUE :"
 # \n et \l sont interprétés par agetty : on les remplace pour l'aperçu
-sed -e 's/\x1b\[H\x1b\[2J//' -e "s/\\\\n/$(hostname)/" -e 's/\\l/tty1/' -e 's/^/    /' "$ISSUE"
+sed -e "s/\\\\n/$(hostname)/" -e 's/\\l/tty1/' -e 's/^/    /' "$ISSUE"
 
 echo ""
-info "Console texte (Ctrl+Alt+F1..F6) : Entrée à l'invite login efface et rafraîchit."
+info "Consoles (Ctrl+Alt+F1..F6) : mises à jour automatiques (agetty --reload)."
+info "Raccourci manuel : Ctrl+D à l'invite login (agetty relancé, écran effacé)."
 info "Test manuel : sudo $HOOK eth0 up"
