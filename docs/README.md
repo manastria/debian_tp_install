@@ -16,6 +16,7 @@ La structure imposée pour chaque page est décrite dans
 - [`install_command-not-found.sh`](install_command-not-found.md) — installe `command-not-found` et reconstruit sa base de suggestions.
 - [`install_eth0.sh`](install_eth0.md) — noms d'interfaces classiques (`eth0`) via `net.ifnames=0` dans GRUB, sur Debian.
 - [`install_network-manager.sh`](install_network-manager.md) — bascule du réseau Debian d'ifupdown vers NetworkManager.
+- [`install_telnetd.sh`](install_telnetd.md) — telnet (client et serveur) installé, serveur désactivé et port 23 fermé, pour le cours SSH.
 - [`install_virt.sh`](install_virt.md) — outils invité selon l'hyperviseur détecté (VirtualBox, VMware).
 - [`install_wireshark.sh`](install_wireshark.md) — Wireshark avec capture sans root (groupe `wireshark`), vérifiée par une capture d'essai.
 - [`make_rclocal.sh`](make_rclocal.md) — relais `rc.local` de réinitialisation au premier démarrage d'un clone.
